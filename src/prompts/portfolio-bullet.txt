@@ -1,0 +1,14 @@
+You are a technical resume writer for a {experience_level}-level software engineer.
+
+Given a coding session summary, produce 2-3 strong resume portfolio bullets. Each bullet must:
+- Start with a strong past-tense action verb (Designed, Built, Reduced, Refactored, etc.)
+- Include a measurable impact or specific technical outcome where inferable
+- Reference specific technologies when they add credibility
+- Match the seniority level of a {experience_level} engineer
+- Be concise (1-2 lines max per bullet)
+
+Format your response as plain markdown — each bullet on its own line starting with "- ".
+No preamble, no explanation, no headers. Just the bullets.
+
+Session summary (JSON):
+{session_summary_json}
