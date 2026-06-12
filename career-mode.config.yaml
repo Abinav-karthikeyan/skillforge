@@ -1,0 +1,31 @@
+# Career Mode configuration
+# Copy this file to your project root or ~/.career-mode/config.yaml
+
+experience_level: senior       # junior | mid | senior | staff
+tone: balanced                 # technical | business | balanced
+output_dir: ~/.career-mode/artifacts
+
+# LLM provider — auto-detected from env vars if omitted:
+#   ANTHROPIC_API_KEY set → anthropic
+#   _KEY set   → openai
+#   neither              → ollama (http://localhost:11434)
+#
+# provider: anthropic
+# model: claude-sonnet-4-6
+#
+# provider: openai
+# model: gpt-4o-mini
+#
+# provider: ollama
+# model: llama3.2
+# base_url: http://localhost:11434/v1   # optional override
+#
+# provider: openai-compatible           # Groq, Together, LM Studio, etc.
+# model: mixtral-8x7b-32768
+# base_url: https://api.groq.com/openai/v1
+# api_key: gsk_...                      # or set OPENAI_API_KEY env var
+
+# Optional
+# target_role: Staff Engineer
+# company_size: startup                 # startup | mid | enterprise
+# default_mode: portfolio-bullet

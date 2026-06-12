@@ -1,0 +1,11 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "pattern": "git commit",
+        "command": "npx career-mode generate --mode portfolio-bullet"
+      }
+    ]
+  }
+}
