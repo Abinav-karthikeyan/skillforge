@@ -1,0 +1,11 @@
+node_modules/
+dist/
+*.env
+.env
+.env.local
+/tmp/
+test-output/
+*.career-mode-session.json
+career-mode-prd.md
+technical-plan.md
+plan/
