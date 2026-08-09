@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "career-mode": {
+      "command": "npx",
+      "args": ["tsx", "/absolute/path/to/careermode-mcp/src/mcp/server.ts"],
+      "env": {
+        "ANTHROPIC_API_KEY": "sk-ant-..."
+      }
+    }
+  }
+}

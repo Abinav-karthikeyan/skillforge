@@ -4,12 +4,14 @@
   "description": "Turn your coding sessions into interview-ready stories, portfolio bullets, and technical deep-dive Q&A",
   "main": "dist/index.js",
   "bin": {
-    "career-mode": "./dist/index.js"
+    "career-mode": "./dist/index.js",
+    "career-mode-mcp": "./dist/mcp/server.js"
   },
   "scripts": {
-    "build": "rimraf dist && tsc",
+    "build": "rimraf dist && tsc && node -e \"require('fs').cpSync('src/prompts','dist/prompts',{recursive:true})\"",
     "dev": "tsx src/index.ts",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "mcp": "tsx src/mcp/server.ts"
   },
   "keywords": [
     "career",
@@ -22,6 +24,7 @@
   "type": "module",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "commander": "^15.0.0",
     "openai": "^6.42.0",
     "uuid": "^14.0.0",

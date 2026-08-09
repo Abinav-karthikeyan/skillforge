@@ -58,6 +58,7 @@ Capture this coding session as a career artifact.
 
 ## Notes
 - You have access to the full conversation transcript — use it. The hook path only has git diffs; the slash command path is always richer.
+- This command shells out to the CLI directly. If Career Mode is registered as an MCP server instead (see `docs/mcp-server.md`), prefer calling its `generate_career_artifact` tool with the same `session_summary` shape rather than shelling out — it's the same pipeline through a typed interface.
 - Be specific with tradeoffs. "Used provider interface over direct Anthropic SDK because X" is better than "made architectural decisions".
 - If no tradeoffs or dead ends are evident, use empty arrays — don't fabricate.
 - The `complexity_signals.files_touched` and `lines_changed` can be estimated from the conversation (count files mentioned / edits made).

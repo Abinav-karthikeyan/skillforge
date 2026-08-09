@@ -10,14 +10,17 @@ Career Mode captures session context at peak richness — right now, while the c
 
 ## How it works
 
-There are two ways Career Mode captures a session:
+Career Mode is a single pipeline (`ingestor → translators → output`) exposed three ways:
 
-| Path | When | Context quality |
+| Interface | When you'd use it | Context source |
 |---|---|---|
-| `/career-mode` slash command | You invoke it at the end of a session | Full conversation transcript — richest |
-| `git commit` hook | Automatic on every commit | Git log + diff only |
+| **CLI** (`career-mode generate`) | Scripting, CI, or piping a git diff directly | `--json` file, or local git log/diff |
+| **`/career-mode` slash command** | End of a Claude Code session, lowest friction | Full conversation transcript — richest |
+| **MCP server** (`career-mode-mcp`) | Any MCP-capable host (Claude Code, Claude Desktop, others); programmatic use | Tool call args (`session_summary`), or git fallback |
 
-Both paths feed the same translation pipeline and write `.md` artifacts to `~/.career-mode/artifacts/`.
+There's also a `git commit` hook path (git log + diff only, no transcript) — see [Configuration](#4-optional-install-the-git-commit-hook) below.
+
+All interfaces feed the same translation pipeline and write `.md` artifacts to `~/.career-mode/artifacts/`. See [docs/mcp-server.md](docs/mcp-server.md) for the MCP server's tool contract and [docs/slash-command.md](docs/slash-command.md) for the slash command walkthrough.
 
 ## Quickstart
 
@@ -61,7 +64,17 @@ Copy-Item claude-code-integration\commands\career-mode.md "$env:USERPROFILE\.cla
 
 Restart Claude Code. `/career-mode` is now available in any session.
 
-### 4. (Optional) Install the git commit hook
+### 4. (Optional) Register the MCP server
+
+Instead of (or alongside) the slash command, register Career Mode as an MCP server so any MCP-capable client can call it as a tool:
+
+```bash
+claude mcp add career-mode -- npx tsx /absolute/path/to/careermode-mcp/src/mcp/server.ts
+```
+
+Or add it to `.mcp.json` directly — see [claude-code-integration/mcp/.mcp.json](claude-code-integration/mcp/.mcp.json) for a template. Full details, tool schemas, and the reasoning for having both a slash command and an MCP server: [docs/mcp-server.md](docs/mcp-server.md).
+
+### 5. (Optional) Install the git commit hook
 
 Add this to your `~/.claude/settings.json` under `hooks`:
 
@@ -178,10 +191,13 @@ src/
   translators/    # One translator per mode — calls LLM, validates, renders markdown
   output/         # Renderer (frontmatter + header + content) + connector interface
     connectors/   # LocalFileConnector — writes .md per session + index.yml
+  mcp/            # server.ts — MCP server wrapping the same pipeline as two tools
+  index.ts        # CLI entry point (commander) — `generate` and `list` commands
 
 claude-code-integration/
   commands/       # career-mode.md — install this as a Claude Code slash command
   hooks/          # post-session.json — reference hook config
+  mcp/            # .mcp.json — reference MCP server registration
 
 tests/
   fixtures/       # sample-session.json — realistic test fixture
@@ -192,12 +208,14 @@ scripts/
 ## Status
 
 This is a weekend v0.1 — working but nascent. Tested on:
-- Anthropic API (Claude Sonnet)
+- Anthropic API (Claude Sonnet) and Ollama (local, no key needed)
 - The `/career-mode` slash command path
+- The CLI (`generate`, `list`) end-to-end against the sample fixture
+- The MCP server (`dist/mcp/server.js`), two ways: `scripts/mcp-smoke-test.ts` drives it through `initialize` → `tools/list` → `list_career_artifacts` → a real `generate_career_artifact` call over the MCP client SDK; separately, `claude mcp add` + `claude mcp get` confirms Claude Code's own MCP client connects to it (`✔ Connected`)
 
 Not yet tested end-to-end:
-- OpenAI and Ollama providers
+- OpenAI provider
 - The git commit hook path
-- `npm link` as a global CLI
+- `npm link` / `npx career-mode-mcp` as installed global binaries
 
 Contributions and issues welcome.
