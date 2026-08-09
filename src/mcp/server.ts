@@ -8,7 +8,9 @@ import { ingestSession } from "../ingestor/index.js";
 import { translatePortfolioBullet } from "../translators/portfolio-bullet.js";
 import { translateInterviewQA } from "../translators/interview-qa.js";
 import { translateTechnicalDeepDive } from "../translators/technical-deep-dive.js";
-import { LocalFileConnector } from "../output/connectors/local-file.js";
+import { createConnector } from "../output/connectors/factory.js";
+import { GistConnector } from "../output/connectors/gist.js";
+import { readLastArtifact } from "../output/last-artifact.js";
 import { readFileSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
@@ -55,12 +57,17 @@ server.registerTool(
             "tradeoffs, dead_ends, technologies, patterns_used, complexity_signals. Omit to fall back to git log/diff."
         ),
       output_dir: z.string().optional().describe("Override the configured output directory."),
+      connector: z
+        .enum(["local", "gist"])
+        .optional()
+        .describe("Output connector: 'local' (default) or 'gist' (also pushes each artifact to a GitHub Gist)."),
     },
   },
-  async ({ mode, session_summary, output_dir }) => {
+  async ({ mode, session_summary, output_dir, connector }) => {
     try {
       const config = loadCalibration();
       if (output_dir) config.output_dir = output_dir;
+      if (connector) config.connector = connector;
 
       const client = createClient({
         provider: config.provider,
@@ -79,7 +86,7 @@ server.registerTool(
         : undefined;
 
       const session = await ingestSession(client, rawJson);
-      const connector = new LocalFileConnector(config.output_dir);
+      const writer = createConnector(config);
 
       const modes: TranslationMode[] =
         mode === "all" ? ["interview-qa", "portfolio-bullet", "technical-deep-dive"] : [mode];
@@ -87,8 +94,8 @@ server.registerTool(
       const sections: string[] = [];
       for (const m of modes) {
         const output = await runTranslator(m, client, session, config);
-        const filepath = await connector.write(output, session);
-        sections.push(`### ${m}\nWritten to: ${filepath}\n\n${output.content}`);
+        const location = await writer.write(output, session);
+        sections.push(`### ${m}\nWritten to: ${location}\n\n${output.content}`);
       }
 
       return { content: [{ type: "text", text: sections.join("\n\n---\n\n") }] };
@@ -127,6 +134,52 @@ server.registerTool(
           ],
         };
       }
+    } catch (err) {
+      return {
+        content: [{ type: "text", text: `Error: ${(err as Error).message}` }],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.registerTool(
+  "share_last_artifact",
+  {
+    title: "Share last artifact via GitHub Gist",
+    description:
+      "Push the most recently generated artifact to a GitHub Gist and return the shareable URL. " +
+      "Useful for showing off an interview answer or portfolio bullet after generating it. " +
+      "Requires GITHUB_TOKEN in the environment or `gist_token` in career-mode.config.yaml (needs `gist` scope only).",
+    inputSchema: {
+      output_dir: z.string().optional().describe("Override the configured artifacts directory."),
+      is_public: z
+        .boolean()
+        .optional()
+        .describe("Create a public gist. Defaults to secret (unlisted)."),
+    },
+  },
+  async ({ output_dir, is_public }) => {
+    try {
+      const config = loadCalibration();
+      const last = readLastArtifact(output_dir ?? config.output_dir);
+      const gist = new GistConnector({
+        token: config.gist_token,
+        isPublic: is_public ?? config.gist_public,
+      });
+      const url = await gist.createGist(
+        last.filename,
+        last.markdown,
+        `Career Mode — ${last.entry.mode} — ${last.entry.one_liner}`
+      );
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Shared: ${url}\nSource: ${last.filepath}\nMode: ${last.entry.mode}\nOne-liner: ${last.entry.one_liner}`,
+          },
+        ],
+      };
     } catch (err) {
       return {
         content: [{ type: "text", text: `Error: ${(err as Error).message}` }],

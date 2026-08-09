@@ -80,7 +80,11 @@ async function main() {
 
   const tools = await client.listTools(undefined, { timeout: COLD_START_TIMEOUT_MS });
   const gotNames = tools.tools.map((t) => t.name).sort();
-  const expectedNames = ["generate_career_artifact", "list_career_artifacts"].sort();
+  const expectedNames = [
+    "generate_career_artifact",
+    "list_career_artifacts",
+    "share_last_artifact",
+  ].sort();
   console.log(`✓ tools/list returned: ${gotNames.join(", ")}`);
   if (JSON.stringify(gotNames) !== JSON.stringify(expectedNames)) {
     throw new Error(`Tool list mismatch. Expected ${expectedNames}, got ${gotNames}`);

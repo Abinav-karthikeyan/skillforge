@@ -30,6 +30,17 @@ Returns the rendered markdown for each generated mode plus the file path it was 
 
 Returns the contents of `index.yml` for the resolved output directory.
 
+### `share_last_artifact`
+
+| Input | Type | Notes |
+|---|---|---|
+| `output_dir` | string (optional) | Overrides the configured artifacts directory. |
+| `is_public` | boolean (optional) | Create a public gist. Defaults to secret (unlisted). |
+
+Reads the most recently generated artifact from `index.yml`, uploads it to a GitHub Gist via the Gist API, and returns the shareable URL. Requires `GITHUB_TOKEN` in the environment or `gist_token` in `career-mode.config.yaml` (needs the `gist` scope, nothing else).
+
+Typical flow in an MCP host: after `generate_career_artifact` writes a portfolio bullet, ask the host to "share the last artifact" — the URL comes back inline and you can drop it into a resume or a message.
+
 ## Running it
 
 ```bash

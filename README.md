@@ -158,6 +158,12 @@ output_dir: ~/.career-mode/artifacts
 # target_role: Staff Engineer
 # company_size: startup         # startup | mid | enterprise
 # default_mode: portfolio-bullet
+
+# Output connector — 'local' (default) writes ~/.career-mode/artifacts.
+# 'gist' also pushes each artifact to a GitHub Gist and returns the URL.
+# connector: gist
+# gist_token: ghp_...           # or set GITHUB_TOKEN env (needs `gist` scope)
+# gist_public: false            # default false → secret gist
 ```
 
 Place this file at `~/.career-mode/config.yaml` (global default) or in your project root (project-level override). Project root takes precedence.
@@ -173,6 +179,9 @@ npx tsx src/index.ts generate --mode portfolio-bullet
 
 # List all generated artifacts
 npx tsx src/index.ts list
+
+# Push the most recent artifact to a GitHub Gist, get a shareable URL back
+GITHUB_TOKEN=ghp_... npx tsx src/index.ts share
 
 # Override output directory
 npx tsx src/index.ts generate --mode all --output-dir ./my-artifacts

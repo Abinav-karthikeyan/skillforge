@@ -12,6 +12,10 @@ export interface CalibrationConfig {
   model?: string;
   base_url?: string;
   api_key?: string;
+  // Output connector settings
+  connector?: "local" | "gist";
+  gist_token?: string; // falls back to GITHUB_TOKEN env
+  gist_public?: boolean; // default false (secret gist)
 }
 
 export const DEFAULT_CALIBRATION: CalibrationConfig = {

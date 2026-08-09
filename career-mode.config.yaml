@@ -29,3 +29,13 @@ output_dir: ~/.career-mode/artifacts
 # target_role: Staff Engineer
 # company_size: startup                 # startup | mid | enterprise
 # default_mode: portfolio-bullet
+
+# Output connector — where generated artifacts are delivered:
+#   local (default): writes ~/.career-mode/artifacts/<file>.md and updates index.yml
+#   gist:            also pushes each artifact to a GitHub Gist (returns the URL);
+#                    still writes locally so index.yml and `share` keep working
+# connector: local
+#
+# Gist settings (only used when connector: gist, or with `career-mode share`):
+# gist_token: ghp_...                   # or set GITHUB_TOKEN env var (needs `gist` scope)
+# gist_public: false                    # default false → secret gist
