@@ -34,21 +34,41 @@ npm install
 
 ### 2. Configure your LLM provider
 
-Copy the sample config to your home directory or project root:
+**The recommended path is `openai-compatible`** — it works with DeepSeek, Groq, Together, Fireworks, xAI, LM Studio, vLLM, Ollama, and OpenAI itself. Bring any endpoint that speaks the OpenAI Chat Completions API.
+
+Copy the sample config and the env template:
 
 ```bash
 cp career-mode.config.yaml ~/.career-mode/config.yaml
+cp .env.example .env                # put real keys here — .env is gitignored
 ```
 
-Then edit it. Provider is auto-detected from environment variables if you skip the config:
+Then edit `~/.career-mode/config.yaml`. Example for DeepSeek (fast, cheap, verified working):
+
+```yaml
+provider: openai-compatible
+model: deepseek-chat
+base_url: https://api.deepseek.com/v1
+api_key: ${DEEPSEEK_API_KEY}       # resolved from .env
+```
+
+The `api_key` field supports `${VAR}` indirection so secrets stay out of the yaml. Add the matching entry to `.env`:
+
+```
+DEEPSEEK_API_KEY=sk-...
+```
+
+`.env` is loaded from your project root first, then `~/.career-mode/.env` as a fallback. Shell env variables always win over both files.
+
+**If you skip the config file entirely**, the provider auto-detects from env:
 
 | Env var set | Provider used |
 |---|---|
-| `ANTHROPIC_API_KEY` | Anthropic (Claude) |
-| `OPENAI_API_KEY` | OpenAI |
+| `ANTHROPIC_API_KEY` | Anthropic (Claude, native SDK) |
+| `OPENAI_API_KEY` | OpenAI (base_url `api.openai.com`) |
 | Neither | Ollama at `localhost:11434` |
 
-See [Configuration](#configuration) for all options including Groq, LM Studio, and other OpenAI-compatible endpoints.
+See [Configuration](#configuration) for the full reference including Anthropic, other OpenAI-compat providers, and connector settings.
 
 ### 3. Install the slash command
 
@@ -217,13 +237,15 @@ scripts/
 ## Status
 
 This is a weekend v0.1 — working but nascent. Tested on:
-- Anthropic API (Claude Sonnet) and Ollama (local, no key needed)
+- Anthropic API (Claude Sonnet), Ollama (local, no key needed), and DeepSeek via the `openai-compatible` path
 - The `/career-mode` slash command path
-- The CLI (`generate`, `list`) end-to-end against the sample fixture
+- The CLI (`generate`, `list`, `share`) end-to-end against the sample fixture
 - The MCP server (`dist/mcp/server.js`), two ways: `scripts/mcp-smoke-test.ts` drives it through `initialize` → `tools/list` → `list_career_artifacts` → a real `generate_career_artifact` call over the MCP client SDK; separately, `claude mcp add` + `claude mcp get` confirms Claude Code's own MCP client connects to it (`✔ Connected`)
+- `.env` loading (project root → `~/.career-mode/.env` fallback) with `${VAR}` indirection in config, verified by `scripts/deepseek-smoke-test.ts`
+- Gist connector, both offline (mocked fetch) and via the MCP `share_last_artifact` tool
 
 Not yet tested end-to-end:
-- OpenAI provider
+- OpenAI direct provider (via `provider: openai` — the `openai-compatible` path with `base_url: https://api.openai.com/v1` is equivalent and works)
 - The git commit hook path
 - `npm link` / `npx career-mode-mcp` as installed global binaries
 

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import "./config/preload-env.js"; // must be the first import — loads .env before anything else
 import { Command } from "commander";
 import { readFileSync } from "fs";
 import { homedir } from "os";

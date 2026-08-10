@@ -5,25 +5,45 @@ experience_level: senior       # junior | mid | senior | staff
 tone: balanced                 # technical | business | balanced
 output_dir: ~/.career-mode/artifacts
 
-# LLM provider — auto-detected from env vars if omitted:
-#   ANTHROPIC_API_KEY set → anthropic
-#   _KEY set   → openai
-#   neither              → ollama (http://localhost:11434)
+# LLM provider — the recommended path is `openai-compatible`, which works with
+# any endpoint that speaks the OpenAI Chat Completions API (DeepSeek, Groq,
+# Together, Fireworks, xAI, LM Studio, vLLM, Ollama, and OpenAI itself).
 #
+# The api_key field supports ${VAR} indirection — put the actual key in a .env
+# file (project root or ~/.career-mode/.env, both gitignored) and reference the
+# env var here. This keeps secrets out of the yaml.
+
+# ── DeepSeek (recommended for cost/quality) ───────────────────────────────────
+# provider: openai-compatible
+# model: deepseek-chat                    # or deepseek-reasoner
+# base_url: https://api.deepseek.com/v1
+# api_key: ${DEEPSEEK_API_KEY}            # put DEEPSEEK_API_KEY=sk-... in .env
+
+# ── Other openai-compatible providers ─────────────────────────────────────────
+# provider: openai-compatible
+# model: llama-3.3-70b-versatile
+# base_url: https://api.groq.com/openai/v1
+# api_key: ${GROQ_API_KEY}
+#
+# provider: openai-compatible
+# model: gpt-4o-mini
+# base_url: https://api.openai.com/v1
+# api_key: ${OPENAI_API_KEY}
+#
+# ── Ollama (local, no key needed) ─────────────────────────────────────────────
+# provider: ollama
+# model: qwen2.5
+# base_url: http://localhost:11434/v1
+#
+# ── Anthropic (native SDK, not openai-compatible) ─────────────────────────────
 # provider: anthropic
 # model: claude-sonnet-4-6
+# api_key: ${ANTHROPIC_API_KEY}
 #
-# provider: openai
-# model: gpt-4o-mini
-#
-# provider: ollama
-# model: llama3.2
-# base_url: http://localhost:11434/v1   # optional override
-#
-# provider: openai-compatible           # Groq, Together, LM Studio, etc.
-# model: mixtral-8x7b-32768
-# base_url: https://api.groq.com/openai/v1
-# api_key: gsk_...                      # or set OPENAI_API_KEY env var
+# Auto-detection (only kicks in when `provider` is unset above):
+#   ANTHROPIC_API_KEY set → anthropic
+#   OPENAI_API_KEY set    → openai (base_url defaults to api.openai.com)
+#   neither               → ollama (http://localhost:11434)
 
 # Optional
 # target_role: Staff Engineer

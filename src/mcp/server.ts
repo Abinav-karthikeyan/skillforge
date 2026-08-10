@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import "../config/preload-env.js"; // must be the first import — loads .env before anything else
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
