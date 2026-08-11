@@ -5,8 +5,6 @@ import { SessionSummary, TranslatorOutput } from "../types/session.js";
 import { CalibrationConfig } from "../types/config.js";
 import { loadPrompt, interpolate } from "./base.js";
 
-// ── Schema ────────────────────────────────────────────────────────────────────
-
 const StarAnswerSchema = z.object({
   situation: z.string(),
   task: z.string(),
@@ -28,8 +26,6 @@ const InterviewQAResponseSchema = z.object({
 
 type InterviewQAResponse = z.infer<typeof InterviewQAResponseSchema>;
 type Question = z.infer<typeof QuestionSchema>;
-
-// ── Renderer ──────────────────────────────────────────────────────────────────
 
 const CATEGORY_LABELS: Record<Question["category"], string> = {
   "system-design": "System Design",
@@ -75,8 +71,6 @@ function renderInterviewQA(data: InterviewQAResponse): string {
   return sections.join("---\n\n");
 }
 
-// ── Translator ────────────────────────────────────────────────────────────────
-
 function stripFences(text: string): string {
   return text
     .replace(/^```(?:json)?\s*/m, "")
@@ -87,9 +81,10 @@ function stripFences(text: string): string {
 export async function translateInterviewQA(
   client: LLMClient,
   session: SessionSummary,
-  config: CalibrationConfig
+  config: CalibrationConfig,
+  promptVersion?: string
 ): Promise<TranslatorOutput> {
-  const template = loadPrompt("interview-qa");
+  const { content: template, version } = loadPrompt("interview-qa", promptVersion);
   const systemPrompt = interpolate(template, {
     experience_level: config.experience_level,
     session_summary_json: JSON.stringify(session.summary, null, 2),
@@ -104,5 +99,6 @@ export async function translateInterviewQA(
     session_id: session.session_id,
     timestamp: new Date().toISOString(),
     content,
+    prompt_version: version,
   };
 }

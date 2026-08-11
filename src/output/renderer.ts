@@ -10,7 +10,7 @@ function buildFrontmatter(output: TranslatorOutput, session: SessionSummary): st
   const techs = session.summary.technologies.map((t) => `"${t}"`).join(", ");
   const oneLiner = session.summary.one_liner.replace(/"/g, '\\"');
 
-  return [
+  const lines = [
     "---",
     `session_id: ${session.session_id}`,
     `mode: ${output.mode}`,
@@ -18,9 +18,14 @@ function buildFrontmatter(output: TranslatorOutput, session: SessionSummary): st
     `source_tool: ${session.source_tool}`,
     `one_liner: "${oneLiner}"`,
     `technologies: [${techs}]`,
-    "---",
-    "",
-  ].join("\n");
+  ];
+
+  if (output.prompt_version) {
+    lines.push(`prompt_version: ${output.prompt_version}`);
+  }
+
+  lines.push("---", "");
+  return lines.join("\n");
 }
 
 function buildHeader(output: TranslatorOutput, session: SessionSummary): string {

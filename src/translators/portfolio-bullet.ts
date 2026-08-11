@@ -7,9 +7,10 @@ import { loadPrompt, interpolate } from "./base.js";
 export async function translatePortfolioBullet(
   client: LLMClient,
   session: SessionSummary,
-  config: CalibrationConfig
+  config: CalibrationConfig,
+  promptVersion?: string
 ): Promise<TranslatorOutput> {
-  const template = loadPrompt("portfolio-bullet");
+  const { content: template, version } = loadPrompt("portfolio-bullet", promptVersion);
   const systemPrompt = interpolate(template, {
     experience_level: config.experience_level,
     session_summary_json: JSON.stringify(session.summary, null, 2),
@@ -22,5 +23,6 @@ export async function translatePortfolioBullet(
     session_id: session.session_id,
     timestamp: new Date().toISOString(),
     content,
+    prompt_version: version,
   };
 }

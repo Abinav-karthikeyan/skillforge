@@ -31,11 +31,12 @@ async function runTranslator(
   mode: TranslationMode,
   client: LLMClient,
   session: SessionSummary,
-  config: CalibrationConfig
+  config: CalibrationConfig,
+  promptVersion?: string
 ): Promise<TranslatorOutput> {
-  if (mode === "portfolio-bullet") return translatePortfolioBullet(client, session, config);
-  if (mode === "interview-qa") return translateInterviewQA(client, session, config);
-  return translateTechnicalDeepDive(client, session, config);
+  if (mode === "portfolio-bullet") return translatePortfolioBullet(client, session, config, promptVersion);
+  if (mode === "interview-qa") return translateInterviewQA(client, session, config, promptVersion);
+  return translateTechnicalDeepDive(client, session, config, promptVersion);
 }
 
 server.registerTool(
@@ -62,9 +63,13 @@ server.registerTool(
         .enum(["local", "gist"])
         .optional()
         .describe("Output connector: 'local' (default) or 'gist' (also pushes each artifact to a GitHub Gist)."),
+      prompt_version: z
+        .string()
+        .optional()
+        .describe("Prompt version to use (e.g. 'v2'). Falls back to CAREER_MODE_PROMPT_VERSION env var, then manifest active version."),
     },
   },
-  async ({ mode, session_summary, output_dir, connector }) => {
+  async ({ mode, session_summary, output_dir, connector, prompt_version }) => {
     try {
       const config = loadCalibration();
       if (output_dir) config.output_dir = output_dir;
@@ -94,7 +99,7 @@ server.registerTool(
 
       const sections: string[] = [];
       for (const m of modes) {
-        const output = await runTranslator(m, client, session, config);
+        const output = await runTranslator(m, client, session, config, prompt_version);
         const location = await writer.write(output, session);
         sections.push(`### ${m}\nWritten to: ${location}\n\n${output.content}`);
       }

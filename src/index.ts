@@ -29,6 +29,7 @@ program
   .option("-j, --json <path>", "Path to pre-formed SessionSummary JSON (slash command path)")
   .option("-o, --output-dir <dir>", "Output directory (overrides config)")
   .option("-c, --connector <name>", "Connector: local | gist (overrides config)")
+  .option("-p, --prompt-version <version>", "Prompt version to use (e.g. v2). Falls back to manifest active version.")
   .action(async (opts) => {
     try {
       const config = loadCalibration();
@@ -58,11 +59,11 @@ program
       for (const mode of modes) {
         let output;
         if (mode === "portfolio-bullet") {
-          output = await translatePortfolioBullet(client, session, config);
+          output = await translatePortfolioBullet(client, session, config, opts.promptVersion);
         } else if (mode === "interview-qa") {
-          output = await translateInterviewQA(client, session, config);
+          output = await translateInterviewQA(client, session, config, opts.promptVersion);
         } else {
-          output = await translateTechnicalDeepDive(client, session, config);
+          output = await translateTechnicalDeepDive(client, session, config, opts.promptVersion);
         }
 
         const filepath = await connector.write(output, session);

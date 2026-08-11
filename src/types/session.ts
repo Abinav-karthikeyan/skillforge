@@ -45,4 +45,5 @@ export interface TranslatorOutput {
   session_id: string;
   timestamp: string;
   content: string;
+  prompt_version?: string;
 }
