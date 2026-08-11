@@ -14,10 +14,10 @@ output_dir: ~/.career-mode/artifacts
 # env var here. This keeps secrets out of the yaml.
 
 # ── DeepSeek (recommended for cost/quality) ───────────────────────────────────
-# provider: openai-compatible
-# model: deepseek-chat                    # or deepseek-reasoner
-# base_url: https://api.deepseek.com/v1
-# api_key: ${DEEPSEEK_API_KEY}            # put DEEPSEEK_API_KEY=sk-... in .env
+provider: openai-compatible
+model: deepseek-chat                    # or deepseek-reasoner
+base_url: https://api.deepseek.com/v1
+api_key: ${DEEPSEEK_API_KEY}            # put DEEPSEEK_API_KEY=sk-... in .env
 
 # ── Other openai-compatible providers ─────────────────────────────────────────
 # provider: openai-compatible
