@@ -1,78 +1,115 @@
 # Career Mode
 
-> Turn your Claude Code sessions into career artifacts — interview answers, resume bullets, and technical deep-dives — while the context is still fresh.
+> Your sessions already contain your best career stories. Career Mode extracts them before you forget.
 
-## The problem
+You just spent four hours debugging a race condition, or designed a provider abstraction that handles five LLM backends, or ripped out legacy auth middleware because legal flagged a compliance gap. In a week you'll remember "fixed some bug." In six months, nothing. Interviews and resumes are reconstructed from faded memory, months after the specifics vanished.
 
-You just spent four hours debugging a subtle race condition, designed a provider abstraction that supports five LLM backends, or ripped out legacy auth middleware for compliance reasons. In a week you'll remember "fixed some bug." In six months you'll remember nothing. Resumes and interview answers are reconstructed from memory long after the specifics have faded.
+**Career Mode captures session context at peak richness** — right now, while the conversation is still open — and translates it into artifacts you can actually use: STAR-format interview answers, XYZ resume bullets, and technical narratives ready for a portfolio or blog post.
 
-Career Mode captures session context at peak richness — right now, while the conversation is still open — and translates it into artifacts you can actually use.
+---
+
+## "Couldn't you just write a skill for this?"
+
+Yes — and that's exactly what Career Mode is *not*.
+
+Career Mode is a different category of thing:
+
+
+The slash command (`/career-mode`) is the lowest-friction entry point. It is not the whole product.
+
+---
 
 ## How it works
 
-Career Mode is a single pipeline (`ingestor → translators → output`) exposed three ways:
+A single pipeline — `ingestor → translators → output` — exposed four ways:
 
-| Interface | When you'd use it | Context source |
+| Surface | When you'd use it | Context source |
 |---|---|---|
-| **CLI** (`career-mode generate`) | Scripting, CI, or piping a git diff directly | `--json` file, or local git log/diff |
-| **`/career-mode` slash command** | End of a Claude Code session, lowest friction | Full conversation transcript — richest |
-| **MCP server** (`career-mode-mcp`) | Any MCP-capable host (Claude Code, Claude Desktop, others); programmatic use | Tool call args (`session_summary`), or git fallback |
+| **`/career-mode`** slash command | End of a Claude Code session | Full conversation transcript — richest signal |
+| **MCP server** (`career-mode-mcp`) | Any MCP-capable host: Claude Desktop, custom tooling | Tool call args (`session_summary`), or git fallback |
+| **CLI** (`career-mode generate`) | Scripts, CI, or piping a git diff | `--json` file, or local git log/diff |
+| **git commit hook** | Every commit, zero extra steps | git log + diff — no session required |
 
-There's also a `git commit` hook path (git log + diff only, no transcript) — see [Configuration](#4-optional-install-the-git-commit-hook) below.
+All four surfaces feed the same pipeline. The `/career-mode` slash command produces the richest output because it has the full conversation; the git hook produces the leanest because it works purely from diff context. Same typed contract at the output end either way.
 
-All interfaces feed the same translation pipeline and write `.md` artifacts to `~/.career-mode/artifacts/`. See [docs/mcp-server.md](docs/mcp-server.md) for the MCP server's tool contract and [docs/slash-command.md](docs/slash-command.md) for the slash command walkthrough.
+---
+
+## The pipeline
+
+```
+session context  →  ingestor  →  SessionSummary  →  translators  →  connector  →  artifact
+```
+
+**Ingestor** normalizes raw context — a conversation transcript, a git diff, or a JSON blob — into a validated `SessionSummary` schema:
+
+```ts
+{
+  one_liner, problem_statement, approach,
+  tradeoffs: [{ decision, reasoning, alternative_considered }],
+  dead_ends: string[],
+  technologies: string[],
+  patterns_used: string[],
+  complexity_signals: { files_touched, lines_changed, test_coverage, debugging_involved }
+}
+```
+
+This typed contract is what makes translators swappable. Adding a new output mode means writing a new translator against the schema — not re-engineering context extraction.
+
+**Translators** are per-mode LLM calls against versioned prompt templates. Prompt quality is iterable independently of code — pin a version, A/B test, roll back. A skill's prompt is frozen in the `.md` file.
+
+**Connectors** are swappable output destinations. `local` writes `.md` files and maintains `index.yml`. `gist` pushes each artifact to a GitHub Gist and returns a shareable URL. `notion` creates a page in a Notion database with structured properties. All non-local connectors also write locally so `index.yml` stays authoritative.
+
+---
 
 ## Quickstart
 
 ### 1. Install
 
 ```bash
-git clone https://github.com/your-username/careermode-mcp
-cd careermode-mcp
-npm install
+npm install -g @abhinavravich1999/skill-forge
+```
+
+Or run without installing:
+
+```bash
+npx @abhinavravich1999/skill-forge generate --help
 ```
 
 ### 2. Configure your LLM provider
 
-**The recommended path is `openai-compatible`** — it works with DeepSeek, Groq, Together, Fireworks, xAI, LM Studio, vLLM, Ollama, and OpenAI itself. Bring any endpoint that speaks the OpenAI Chat Completions API.
-
-Copy the sample config and the env template:
+Career Mode has its own LLM client, independent of whatever powers your Claude Code session. The recommended path is `openai-compatible` — it works with DeepSeek, Groq, Together, Fireworks, xAI, LM Studio, vLLM, Ollama, and OpenAI itself.
 
 ```bash
 cp career-mode.config.yaml ~/.career-mode/config.yaml
-cp .env.example .env                # put real keys here — .env is gitignored
+cp .env.example .env
 ```
 
-Then edit `~/.career-mode/config.yaml`. Example for DeepSeek (fast, cheap, verified working):
+Edit `~/.career-mode/config.yaml`. DeepSeek is fast and cheap — a good default:
 
 ```yaml
 provider: openai-compatible
 model: deepseek-chat
 base_url: https://api.deepseek.com/v1
-api_key: ${DEEPSEEK_API_KEY}       # resolved from .env
+api_key: ${DEEPSEEK_API_KEY}       # resolved from .env — secrets stay out of yaml
 ```
 
-The `api_key` field supports `${VAR}` indirection so secrets stay out of the yaml. Add the matching entry to `.env`:
+Add the key to `.env`:
 
 ```
 DEEPSEEK_API_KEY=sk-...
 ```
 
-`.env` is loaded from your project root first, then `~/.career-mode/.env` as a fallback. Shell env variables always win over both files.
+`.env` is loaded from project root first, then `~/.career-mode/.env`. Shell env always wins.
 
-**If you skip the config file entirely**, the provider auto-detects from env:
+**Skip the config file entirely** and the provider auto-detects from env:
 
 | Env var set | Provider used |
 |---|---|
 | `ANTHROPIC_API_KEY` | Anthropic (Claude, native SDK) |
-| `OPENAI_API_KEY` | OpenAI (base_url `api.openai.com`) |
+| `OPENAI_API_KEY` | OpenAI (`api.openai.com`) |
 | Neither | Ollama at `localhost:11434` |
 
-See [Configuration](#configuration) for the full reference including Anthropic, other OpenAI-compat providers, and connector settings.
-
 ### 3. Install the slash command
-
-Copy the slash command file to Claude Code's global commands directory:
 
 ```bash
 # macOS / Linux
@@ -86,17 +123,17 @@ Restart Claude Code. `/career-mode` is now available in any session.
 
 ### 4. (Optional) Register the MCP server
 
-Instead of (or alongside) the slash command, register Career Mode as an MCP server so any MCP-capable client can call it as a tool:
+Register Career Mode as an MCP server so any MCP-capable client can call it as a tool — including Claude Code, Claude Desktop, or your own tooling:
 
 ```bash
-claude mcp add career-mode -- npx tsx /absolute/path/to/careermode-mcp/src/mcp/server.ts
+claude mcp add skill-forge -- npx --package=@abhinavravich1999/skill-forge skill-forge-mcp
 ```
 
-Or add it to `.mcp.json` directly — see [claude-code-integration/mcp/.mcp.json](claude-code-integration/mcp/.mcp.json) for a template. Full details, tool schemas, and the reasoning for having both a slash command and an MCP server: [docs/mcp-server.md](docs/mcp-server.md).
+Or add it to `.mcp.json` directly — see [claude-code-integration/mcp/.mcp.json](claude-code-integration/mcp/.mcp.json). Full tool schemas and the reasoning for running both the slash command and MCP server: [docs/mcp-server.md](docs/mcp-server.md).
 
 ### 5. (Optional) Install the git commit hook
 
-Add this to your `~/.claude/settings.json` under `hooks`:
+Fire Career Mode on every commit — no session required, no extra steps:
 
 ```json
 {
@@ -105,24 +142,71 @@ Add this to your `~/.claude/settings.json` under `hooks`:
       {
         "matcher": "Bash",
         "pattern": "git commit",
-        "command": "npx tsx /path/to/careermode-mcp/src/index.ts generate --mode portfolio-bullet"
+        "command": "npx @abhinavravich1999/skill-forge generate --mode portfolio-bullet"
       }
     ]
   }
 }
 ```
 
+Add this to `~/.claude/settings.json` under `hooks`.
+
+### 6. (Optional) Connect to Notion
+
+Push artifacts directly into a Notion database — turn Career Mode into a living brag doc.
+
+**One command does everything** — token validation, database creation, config write:
+
+```bash
+career-mode auth notion
+```
+
+The guided flow:
+
+1. Creates a Notion integration at https://www.notion.so/profile/integrations
+2. Shares a page with the integration in the Notion UI
+3. Pastes the integration token when prompted (input is hidden — never logged)
+4. Picks the parent page from a list (or pastes a URL/ID)
+5. Done — the database is created, credentials written to `~/.career-mode/.env`, config updated
+
+Artifacts now land in Notion with full metadata (Mode, Technologies, Patterns) as database properties.
+
+**Check status at any time:**
+
+```bash
+career-mode auth status
+```
+
+**From an MCP host** (Claude Code, Claude Desktop, etc.) — call `notion_auth_status` to see whether Notion is configured without leaving your session.
+
+<details>
+<summary>Manual / non-interactive setup</summary>
+
+```bash
+# 1. Add NOTION_TOKEN=ntn_... to ~/.career-mode/.env
+# 2. Create the database:
+npx tsx scripts/notion-setup.ts <parent-page-id>
+# 3. Add to ~/.career-mode/config.yaml:
+#   connector: notion
+#   notion_token: ${NOTION_TOKEN}
+#   notion_database_id: <printed-id>
+```
+
+</details>
+
+---
+
 ## Using the slash command
 
-At the end of a coding session in Claude Code, type:
+At the end of a Claude Code session:
 
 ```
 /career-mode
 ```
 
-Claude will synthesize the session into a structured summary, run it through the translation pipeline, and write an artifact to `~/.career-mode/artifacts/`. The output path is printed in the terminal.
+Claude synthesizes the session into a structured summary, runs it through the pipeline, and writes an artifact to `~/.career-mode/artifacts/`. The output path is printed in the terminal.
 
-You can specify the output mode:
+Specify the mode:
 
 ```
 /career-mode --mode interview-qa
@@ -131,27 +215,29 @@ You can specify the output mode:
 /career-mode --mode all
 ```
 
-Default is `interview-qa`.
+Default is `interview-qa`. See [docs/slash-command.md](docs/slash-command.md) for a full walkthrough.
 
-See [docs/slash-command.md](docs/slash-command.md) for a detailed walkthrough.
+---
 
 ## Output modes
 
 ### `interview-qa`
-Generates 2–4 interview questions with full STAR answers (Situation, Task, Action, Result), follow-up questions an interviewer might ask, and a calibration note on how to pitch the answer for your experience level.
+2–4 STAR-format interview questions with full answers (Situation, Task, Action, Result), follow-up questions an interviewer would actually ask, and a calibration note on how to pitch the answer for your experience level.
 
 ### `portfolio-bullet`
-Generates 3–5 resume/portfolio bullet points in the XYZ format ("Accomplished X by doing Y, resulting in Z"). Calibrated to your `experience_level` in config.
+3–5 resume bullets in XYZ format ("Accomplished X by doing Y, resulting in Z"). Calibrated to `experience_level` and `target_role` in config.
 
 ### `technical-deep-dive`
-Generates a technical narrative suitable for a blog post, design doc, or engineering portfolio — covering the problem, approach, tradeoffs, and lessons learned.
+A technical narrative for a blog post, design doc, or engineering portfolio — problem, approach, tradeoffs, and lessons learned, structured for an engineering audience.
 
 ### `all`
-Runs all three modes and writes separate files for each.
+All three modes, separate files.
+
+---
 
 ## Configuration
 
-Full reference for `career-mode.config.yaml`:
+`~/.career-mode/config.yaml` (global) or `<project-root>/career-mode.config.yaml` (project override — takes precedence):
 
 ```yaml
 experience_level: senior       # junior | mid | senior | staff
@@ -169,7 +255,7 @@ output_dir: ~/.career-mode/artifacts
 # model: llama3.2
 # base_url: http://localhost:11434/v1
 
-# provider: openai-compatible   # Groq, Together AI, LM Studio, etc.
+# provider: openai-compatible   # Groq, Together AI, LM Studio, DeepSeek, etc.
 # model: mixtral-8x7b-32768
 # base_url: https://api.groq.com/openai/v1
 # api_key: gsk_...
@@ -179,33 +265,42 @@ output_dir: ~/.career-mode/artifacts
 # company_size: startup         # startup | mid | enterprise
 # default_mode: portfolio-bullet
 
-# Output connector — 'local' (default) writes ~/.career-mode/artifacts.
-# 'gist' also pushes each artifact to a GitHub Gist and returns the URL.
-# connector: gist
-# gist_token: ghp_...           # or set GITHUB_TOKEN env (needs `gist` scope)
-# gist_public: false            # default false → secret gist
+# Output connector
+# connector: local              # default — writes ~/.career-mode/artifacts/
+# connector: gist               # also pushes each artifact to a GitHub Gist
+# gist_token: ghp_...           # or set GITHUB_TOKEN (needs `gist` scope)
+# gist_public: false            # default: secret gist
+# connector: notion             # also creates a Notion page with metadata
+# notion_token: ${NOTION_TOKEN}         # run `career-mode auth notion` to set up
+# notion_database_id: ${NOTION_DATABASE_ID}
 ```
 
-Place this file at `~/.career-mode/config.yaml` (global default) or in your project root (project-level override). Project root takes precedence.
+---
 
 ## CLI reference
 
 ```bash
-# Generate artifacts from a session JSON (slash command path)
-npx tsx src/index.ts generate --mode interview-qa --json ~/.career-mode-session.json
+# Generate from a session JSON (slash command path)
+career-mode generate --mode interview-qa --json ~/.career-mode-session.json
 
-# Generate from git context (hook path — no --json flag)
-npx tsx src/index.ts generate --mode portfolio-bullet
+# Generate from git context (hook path — no --json)
+career-mode generate --mode portfolio-bullet
 
 # List all generated artifacts
-npx tsx src/index.ts list
+career-mode list
 
-# Push the most recent artifact to a GitHub Gist, get a shareable URL back
-GITHUB_TOKEN=ghp_... npx tsx src/index.ts share
+# Push the most recent artifact to a GitHub Gist
+career-mode share
 
 # Override output directory
-npx tsx src/index.ts generate --mode all --output-dir ./my-artifacts
+career-mode generate --mode all --output-dir ./my-artifacts
+
+# Auth subcommands
+career-mode auth notion          # guided Notion setup (interactive)
+career-mode auth status          # show which connectors are authenticated
 ```
+
+---
 
 ## Project structure
 
@@ -213,40 +308,48 @@ npx tsx src/index.ts generate --mode all --output-dir ./my-artifacts
 src/
   types/          # Zod schemas — SessionSummary, TranslatorOutput, CalibrationConfig
   claude/         # LLM client — provider factory + Anthropic / OpenAI-compatible providers
-  config/         # Config loader (project-root → home fallback chain)
+  config/         # Config loader (project-root → home fallback chain), .env loader
   adapters/       # Input adapters — git context (hook path), stdin/file (slash command path)
-  ingestor/       # Normalizes both paths into a SessionSummary
-  prompts/        # Prompt templates (.txt) for each mode
-  translators/    # One translator per mode — calls LLM, validates, renders markdown
+  ingestor/       # Normalizes all input paths into a typed SessionSummary
+  prompts/        # Versioned prompt templates (.txt) per mode
+  translators/    # One translator per mode — LLM call, validation, markdown render
   output/         # Renderer (frontmatter + header + content) + connector interface
-    connectors/   # LocalFileConnector — writes .md per session + index.yml
-  mcp/            # server.ts — MCP server wrapping the same pipeline as two tools
-  index.ts        # CLI entry point (commander) — `generate` and `list` commands
+    connectors/   # LocalFileConnector, GistConnector, NotionConnector + self-registering registry
+  auth/           # Connector auth flows — notion.ts (interactive), config-writer.ts (env/.yaml merge)
+  mcp/            # server.ts — MCP server: generate, list, share, notion_auth_status tools
+  index.ts        # CLI entry point — generate, list, share, auth subcommands
 
 claude-code-integration/
-  commands/       # career-mode.md — install this as a Claude Code slash command
+  commands/       # career-mode.md — install as a Claude Code slash command
   hooks/          # post-session.json — reference hook config
   mcp/            # .mcp.json — reference MCP server registration
 
 tests/
   fixtures/       # sample-session.json — realistic test fixture
 scripts/
-  test-local.ts   # Smoke test: runs the full pipeline against the fixture
+  test-local.ts          # Smoke test: full pipeline against the fixture
+  mcp-smoke-test.ts      # MCP protocol smoke test (spawns dist/mcp/server.js)
+  test-share-notion.ts   # Targeted test: share_last_artifact → notion via MCP
+  notion-setup.ts        # Manual database creation (non-interactive fallback)
 ```
+
+---
 
 ## Status
 
-This is a weekend v0.1 — working but nascent. Tested on:
-- Anthropic API (Claude Sonnet), Ollama (local, no key needed), and DeepSeek via the `openai-compatible` path
-- The `/career-mode` slash command path
-- The CLI (`generate`, `list`, `share`) end-to-end against the sample fixture
-- The MCP server (`dist/mcp/server.js`), two ways: `scripts/mcp-smoke-test.ts` drives it through `initialize` → `tools/list` → `list_career_artifacts` → a real `generate_career_artifact` call over the MCP client SDK; separately, `claude mcp add` + `claude mcp get` confirms Claude Code's own MCP client connects to it (`✔ Connected`)
-- `.env` loading (project root → `~/.career-mode/.env` fallback) with `${VAR}` indirection in config, verified by `scripts/deepseek-smoke-test.ts`
-- Gist connector, both offline (mocked fetch) and via the MCP `share_last_artifact` tool
+v0.1 — working, weekend-built. Tested on:
+
+- Anthropic API (Claude Sonnet), Ollama (local, no key), DeepSeek via `openai-compatible`
+- `/career-mode` slash command path end-to-end
+- CLI (`generate`, `list`, `share`, `auth notion`, `auth status`) against real APIs
+- MCP server: `scripts/mcp-smoke-test.ts` drives `initialize → tools/list → list_career_artifacts → generate_career_artifact` over MCP client SDK; `claude mcp add` + `claude mcp get` confirms Claude Code's own MCP client connects (`✔ Connected`)
+- `.env` loading with `${VAR}` config indirection, verified by `scripts/deepseek-smoke-test.ts`
+- Gist connector — offline (mocked fetch) and live via the MCP `share_last_artifact` tool
+- Notion connector — live end-to-end: `generate --connector notion` (both `interview-qa` and `portfolio-bullet`), `share_last_artifact --destination notion` via MCP; properties (Title, Mode, Technologies, Date, Patterns) all populated
 
 Not yet tested end-to-end:
-- OpenAI direct provider (via `provider: openai` — the `openai-compatible` path with `base_url: https://api.openai.com/v1` is equivalent and works)
-- The git commit hook path
+- OpenAI direct provider (`provider: openai` — the `openai-compatible` path with `base_url: https://api.openai.com/v1` is equivalent and works)
+- git commit hook path
 - `npm link` / `npx career-mode-mcp` as installed global binaries
 
 Contributions and issues welcome.

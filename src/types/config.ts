@@ -13,9 +13,13 @@ export interface CalibrationConfig {
   base_url?: string;
   api_key?: string;
   // Output connector settings
-  connector?: "local" | "gist";
-  gist_token?: string; // falls back to GITHUB_TOKEN env
-  gist_public?: boolean; // default false (secret gist)
+  connector?: string;
+  gist_token?: string;
+  gist_public?: boolean;
+  // Notion connector settings
+  notion_token?: string;
+  notion_database_id?: string;
+  notion_property_map?: Record<string, string>;
 }
 
 export const DEFAULT_CALIBRATION: CalibrationConfig = {

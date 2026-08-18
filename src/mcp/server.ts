@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import "../config/preload-env.js"; // must be the first import — loads .env before anything else
+import "../config/preload-env.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
@@ -9,8 +9,9 @@ import { ingestSession } from "../ingestor/index.js";
 import { translatePortfolioBullet } from "../translators/portfolio-bullet.js";
 import { translateInterviewQA } from "../translators/interview-qa.js";
 import { translateTechnicalDeepDive } from "../translators/technical-deep-dive.js";
-import { createConnector } from "../output/connectors/factory.js";
+import { createConnector, listConnectors } from "../output/connectors/factory.js";
 import { GistConnector } from "../output/connectors/gist.js";
+import { NotionConnector } from "../output/connectors/notion.js";
 import { readLastArtifact } from "../output/last-artifact.js";
 import { readFileSync } from "fs";
 import { join } from "path";
@@ -20,8 +21,14 @@ import { SessionSummary } from "../types/session.js";
 import { CalibrationConfig } from "../types/config.js";
 import { LLMClient } from "../claude/types.js";
 
+function parseFrontmatterArray(markdown: string, key: string): string[] {
+  const match = markdown.match(new RegExp(`^${key}:\\s*\\[(.*)\\]`, "m"));
+  if (!match) return [];
+  return match[1].split(",").map((s) => s.trim().replace(/^"|"$/g, "")).filter(Boolean);
+}
+
 const server = new McpServer({
-  name: "career-mode",
+  name: "skill-forge",
   version: "0.1.0",
 });
 
@@ -60,9 +67,9 @@ server.registerTool(
         ),
       output_dir: z.string().optional().describe("Override the configured output directory."),
       connector: z
-        .enum(["local", "gist"])
+        .string()
         .optional()
-        .describe("Output connector: 'local' (default) or 'gist' (also pushes each artifact to a GitHub Gist)."),
+        .describe(`Output connector (${listConnectors().join(", ")}). Defaults to 'local'.`),
       prompt_version: z
         .string()
         .optional()
@@ -152,37 +159,61 @@ server.registerTool(
 server.registerTool(
   "share_last_artifact",
   {
-    title: "Share last artifact via GitHub Gist",
+    title: "Share last artifact",
     description:
-      "Push the most recently generated artifact to a GitHub Gist and return the shareable URL. " +
+      "Push the most recently generated artifact to a destination (GitHub Gist or Notion) and return the shareable URL. " +
       "Useful for showing off an interview answer or portfolio bullet after generating it. " +
-      "Requires GITHUB_TOKEN in the environment or `gist_token` in career-mode.config.yaml (needs `gist` scope only).",
+      "For Gist: requires GITHUB_TOKEN or `gist_token` in config (needs `gist` scope). " +
+      "For Notion: requires NOTION_TOKEN and `notion_database_id` in config.",
     inputSchema: {
       output_dir: z.string().optional().describe("Override the configured artifacts directory."),
+      destination: z
+        .enum(["gist", "notion"])
+        .default("gist")
+        .describe("Where to share: 'gist' (GitHub Gist) or 'notion' (Notion database)."),
       is_public: z
         .boolean()
         .optional()
-        .describe("Create a public gist. Defaults to secret (unlisted)."),
+        .describe("For gist: create a public gist. Defaults to secret (unlisted)."),
     },
   },
-  async ({ output_dir, is_public }) => {
+  async ({ output_dir, destination, is_public }) => {
     try {
       const config = loadCalibration();
       const last = readLastArtifact(output_dir ?? config.output_dir);
-      const gist = new GistConnector({
-        token: config.gist_token,
-        isPublic: is_public ?? config.gist_public,
-      });
-      const url = await gist.createGist(
-        last.filename,
-        last.markdown,
-        `Career Mode — ${last.entry.mode} — ${last.entry.one_liner}`
-      );
+
+      let url: string;
+      if (destination === "notion") {
+        const notion = new NotionConnector({
+          token: config.notion_token,
+          databaseId: config.notion_database_id,
+          propertyMap: config.notion_property_map,
+        });
+        const techs = parseFrontmatterArray(last.markdown, "technologies");
+        url = await notion.writePreRendered(last.markdown, {
+          oneLiner: last.entry.one_liner,
+          mode: last.entry.mode,
+          date: last.entry.timestamp.slice(0, 10),
+          technologies: techs,
+          patterns: [],
+        });
+      } else {
+        const gist = new GistConnector({
+          token: config.gist_token,
+          isPublic: is_public ?? config.gist_public,
+        });
+        url = await gist.createGist(
+          last.filename,
+          last.markdown,
+          `Career Mode — ${last.entry.mode} — ${last.entry.one_liner}`
+        );
+      }
+
       return {
         content: [
           {
             type: "text",
-            text: `Shared: ${url}\nSource: ${last.filepath}\nMode: ${last.entry.mode}\nOne-liner: ${last.entry.one_liner}`,
+            text: `Shared to ${destination}: ${url}\nSource: ${last.filepath}\nMode: ${last.entry.mode}\nOne-liner: ${last.entry.one_liner}`,
           },
         ],
       };
@@ -192,6 +223,63 @@ server.registerTool(
         isError: true,
       };
     }
+  }
+);
+
+server.registerTool(
+  "notion_auth_status",
+  {
+    title: "Notion auth status",
+    description:
+      "Check whether Notion is configured for Career Mode. Returns the current status " +
+      "and the CLI command to run if setup is needed. Does not expose secrets.",
+    inputSchema: {},
+  },
+  async () => {
+    const token = process.env.NOTION_TOKEN;
+    const dbId = process.env.NOTION_DATABASE_ID;
+
+    if (token && dbId) {
+      // Mask the token — show only last 4 chars
+      const masked = `ntn_…${token.slice(-4)}`;
+      return {
+        content: [
+          {
+            type: "text",
+            text: [
+              "✓ Notion is configured.",
+              `  Token:    ${masked}`,
+              `  Database: ${dbId}`,
+              "",
+              "Use share_last_artifact with destination: notion to push an artifact.",
+            ].join("\n"),
+          },
+        ],
+      };
+    }
+
+    const missing = [
+      !token ? "NOTION_TOKEN" : null,
+      !dbId ? "NOTION_DATABASE_ID" : null,
+    ]
+      .filter(Boolean)
+      .join(", ");
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: [
+            `✗ Notion is not configured (missing: ${missing}).`,
+            "",
+            "Run this in a terminal to complete setup:",
+            "  career-mode auth notion",
+            "",
+            "Or follow the manual steps in the README under 'Connect to Notion'.",
+          ].join("\n"),
+        },
+      ],
+    };
   }
 );
 

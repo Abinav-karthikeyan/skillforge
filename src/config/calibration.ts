@@ -7,14 +7,8 @@ import {
   DEFAULT_CALIBRATION,
 } from "../types/config.js";
 
-/**
- * Resolves `${VAR}` in a string against process.env. Only matches when the
- * ENTIRE value is a single `${VAR}` reference — mixed strings like
- * "prefix-${VAR}-suffix" are left as-is by design (secrets shouldn't be
- * spliced into partial strings; if you need that, put the whole thing in env).
- * Throws with a clear error when the referenced env var is unset — silent
- * fallback would produce a literal "${DEEPSEEK_API_KEY}" that 401s at call time.
- */
+const SECRET_FIELDS = ["api_key", "gist_token", "notion_token", "notion_database_id"];
+
 function resolveEnvRef(value: string, fieldName: string): string {
   const match = /^\$\{(\w+)\}$/.exec(value);
   if (!match) return value;
@@ -39,15 +33,13 @@ export function loadCalibration(): CalibrationConfig {
     if (existsSync(p)) {
       try {
         const raw = readFileSync(p, "utf-8");
-        const parsed = parse(raw) as Partial<CalibrationConfig>;
-        // Fields that commonly hold secrets — support ${VAR} indirection.
-        if (parsed.api_key) parsed.api_key = resolveEnvRef(parsed.api_key, "api_key");
-        if (parsed.gist_token) parsed.gist_token = resolveEnvRef(parsed.gist_token, "gist_token");
+        const parsed = parse(raw) as Record<string, any>;
+        for (const field of SECRET_FIELDS) {
+          if (parsed[field]) parsed[field] = resolveEnvRef(parsed[field], field);
+        }
         return { ...DEFAULT_CALIBRATION, ...parsed };
       } catch (err) {
-        // If the failure is our env-ref error, surface it — don't silently fall back.
         if (err instanceof Error && err.message.includes("references env var")) throw err;
-        // Otherwise (yaml parse issue, io error), fall through to the next candidate.
       }
     }
   }

@@ -1,6 +1,7 @@
 import { TranslatorOutput, SessionSummary } from "../../types/session.js";
 import { renderMarkdown } from "../renderer.js";
 import { CareerModeConnector } from "./types.js";
+import { registerConnector } from "./registry.js";
 
 export interface GistConnectorOptions {
   token?: string;
@@ -70,3 +71,15 @@ export class GistConnector implements CareerModeConnector {
     return data.html_url;
   }
 }
+
+registerConnector({
+  name: "gist",
+  secretFields: ["gist_token"],
+  alwaysWriteLocal: true,
+  create(config) {
+    return new GistConnector({
+      token: config.gist_token,
+      isPublic: config.gist_public,
+    });
+  },
+});

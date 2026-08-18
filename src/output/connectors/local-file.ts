@@ -4,6 +4,7 @@ import { homedir } from "os";
 import { SessionSummary, TranslatorOutput } from "../../types/session.js";
 import { renderMarkdown } from "../renderer.js";
 import { CareerModeConnector } from "./types.js";
+import { registerConnector } from "./registry.js";
 
 function resolveOutputDir(outputDir?: string): string {
   const dir = outputDir ?? "~/.career-mode/artifacts";
@@ -62,3 +63,12 @@ export class LocalFileConnector implements CareerModeConnector {
     appendFileSync(indexPath, entry, "utf-8");
   }
 }
+
+registerConnector({
+  name: "local",
+  secretFields: [],
+  alwaysWriteLocal: false,
+  create(config) {
+    return new LocalFileConnector(config.output_dir);
+  },
+});

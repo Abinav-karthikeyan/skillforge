@@ -59,3 +59,13 @@ api_key: ${DEEPSEEK_API_KEY}            # put DEEPSEEK_API_KEY=sk-... in .env
 # Gist settings (only used when connector: gist, or with `career-mode share`):
 # gist_token: ghp_...                   # or set GITHUB_TOKEN env var (needs `gist` scope)
 # gist_public: false                    # default false → secret gist
+
+# Notion settings (connector: notion):
+# Run `npx tsx scripts/notion-setup.ts <parent-page-id>` to create the database.
+notion_token: ${NOTION_TOKEN}
+notion_database_id: ${NOTION_DATABASE_ID}
+# Optional column mapping if your DB uses different property names:
+# notion_property_map:
+#   Title: "Story"
+#   Mode: "Type"
+#   One-liner: "Summary"

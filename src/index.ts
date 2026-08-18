@@ -10,15 +10,16 @@ import { ingestSession } from "./ingestor/index.js";
 import { translatePortfolioBullet } from "./translators/portfolio-bullet.js";
 import { translateInterviewQA } from "./translators/interview-qa.js";
 import { translateTechnicalDeepDive } from "./translators/technical-deep-dive.js";
-import { createConnector } from "./output/connectors/factory.js";
+import { createConnector, listConnectors } from "./output/connectors/factory.js";
 import { GistConnector } from "./output/connectors/gist.js";
 import { readLastArtifact } from "./output/last-artifact.js";
 import { TranslationMode } from "./types/session.js";
+import { authNotion } from "./auth/notion.js";
 
 const program = new Command();
 
 program
-  .name("career-mode")
+  .name("skill-forge")
   .description("Transform coding sessions into career artifacts")
   .version("0.1.0");
 
@@ -28,7 +29,7 @@ program
   .option("-m, --mode <mode>", "Translation mode: interview-qa, portfolio-bullet, technical-deep-dive, all", "portfolio-bullet")
   .option("-j, --json <path>", "Path to pre-formed SessionSummary JSON (slash command path)")
   .option("-o, --output-dir <dir>", "Output directory (overrides config)")
-  .option("-c, --connector <name>", "Connector: local | gist (overrides config)")
+  .option("-c, --connector <name>", `Connector: ${listConnectors().join(" | ")} (overrides config)`)
   .option("-p, --prompt-version <version>", "Prompt version to use (e.g. v2). Falls back to manifest active version.")
   .action(async (opts) => {
     try {
@@ -125,6 +126,40 @@ program
       console.error("Error:", (err as Error).message);
       process.exit(1);
     }
+  });
+
+// ── auth ───────────────────────────────────────────────────────────────────
+const authCmd = program
+  .command("auth")
+  .description("Authenticate with external connectors");
+
+authCmd
+  .command("notion")
+  .description("Connect Career Mode to a Notion workspace (interactive setup)")
+  .action(async () => {
+    try {
+      await authNotion();
+    } catch (err) {
+      console.error("Error:", (err as Error).message);
+      process.exit(1);
+    }
+  });
+
+authCmd
+  .command("status")
+  .description("Show which connectors are authenticated")
+  .action(() => {
+    const notionToken = process.env.NOTION_TOKEN;
+    const notionDbId = process.env.NOTION_DATABASE_ID;
+    const notion = notionToken && notionDbId
+      ? `✓ notion   database: ${notionDbId.slice(0, 8)}…`
+      : "✗ notion   not configured — run: career-mode auth notion";
+    const gist = process.env.GITHUB_TOKEN
+      ? `✓ gist     token set`
+      : "✗ gist     not configured — set GITHUB_TOKEN in .env";
+    console.log("\nConnector status:");
+    console.log(`  ${notion}`);
+    console.log(`  ${gist}`);
   });
 
 program.parse();

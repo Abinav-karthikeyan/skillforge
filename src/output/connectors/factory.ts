@@ -1,14 +1,14 @@
 import { CalibrationConfig } from "../../types/config.js";
 import { TranslatorOutput, SessionSummary } from "../../types/session.js";
 import { CareerModeConnector } from "./types.js";
+import { getConnectorRegistration, listConnectors } from "./registry.js";
 import { LocalFileConnector } from "./local-file.js";
-import { GistConnector } from "./gist.js";
 
-/**
- * Chains connectors — writes to each in order, returns the LAST one's result.
- * Used for `connector: gist` so the local index/backup still gets written but
- * the caller sees the shareable Gist URL as the primary return value.
- */
+// Side-effect imports: each module calls registerConnector() at load time.
+import "./local-file.js";
+import "./gist.js";
+import "./notion.js";
+
 class CompoundConnector implements CareerModeConnector {
   constructor(private readonly connectors: CareerModeConnector[]) {}
 
@@ -21,20 +21,17 @@ class CompoundConnector implements CareerModeConnector {
   }
 }
 
+export { listConnectors };
+
 export function createConnector(config: CalibrationConfig): CareerModeConnector {
-  const type = config.connector ?? "local";
-  const local = new LocalFileConnector(config.output_dir);
+  const name = config.connector ?? "local";
+  const reg = getConnectorRegistration(name);
+  const connector = reg.create(config);
 
-  if (type === "local") return local;
-
-  if (type === "gist") {
-    const gist = new GistConnector({
-      token: config.gist_token,
-      isPublic: config.gist_public,
-    });
-    // Local still writes so index.yml stays authoritative and share_last_artifact keeps working.
-    return new CompoundConnector([local, gist]);
+  if (reg.alwaysWriteLocal) {
+    const local = new LocalFileConnector(config.output_dir);
+    return new CompoundConnector([local, connector]);
   }
 
-  throw new Error(`Unknown connector "${type}". Valid options: local, gist`);
+  return connector;
 }
