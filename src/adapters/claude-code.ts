@@ -15,7 +15,13 @@ export function gatherGitContext(): RawContext {
   };
 
   const git_log = run("git log --oneline -10");
-  const git_diff = run("git diff HEAD~1 HEAD --stat --unified=3");
+  const rawDiff = run("git diff HEAD~1 HEAD --stat --unified=3");
+  // Cap diff at ~15 KB — large commits (new files) exceed LLM JSON-output limits.
+  const MAX_DIFF = 15_000;
+  const git_diff =
+    rawDiff.length > MAX_DIFF
+      ? rawDiff.slice(0, MAX_DIFF) + "\n\n[diff truncated — showing first 15 KB of a larger change]"
+      : rawDiff;
 
   if (!git_log && !git_diff) {
     throw new Error(
