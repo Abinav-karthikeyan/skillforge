@@ -1,0 +1,34 @@
+{
+  "session_id": "fixture-ml-001",
+  "timestamp": "2026-08-05T16:00:00.000Z",
+  "source_tool": "claude-code",
+  "summary": {
+    "one_liner": "Built a feature engineering pipeline for a churn prediction model that reduced feature computation time from 4 hours to 18 minutes via incremental materialization",
+    "problem_statement": "The existing churn model retrained weekly using a batch feature job that scanned 3 years of user event logs from scratch each run — 4 hours on a 16-core EMR cluster. As the event log grew, this was projected to hit 8+ hours by Q4, making the retraining window incompatible with the weekly business review cadence. Additionally, features were inconsistently defined between training and serving, causing a training-serving skew that degraded model accuracy by an estimated 8%.",
+    "approach": "Introduced a feature store backed by Delta Lake on S3. Features are computed incrementally: each run processes only the new events since the last watermark, then merges into the feature table using Delta's MERGE INTO. Point-in-time correct joins use Delta's time travel to reconstruct feature values as they existed at the moment of the training label event (preventing leakage). The same feature definitions run at serving time via a thin Python wrapper, eliminating training-serving skew.",
+    "tradeoffs": [
+      {
+        "decision": "Delta Lake over Apache Hudi for incremental materialization",
+        "reasoning": "Delta Lake's MERGE INTO syntax is significantly cleaner for upsert semantics on a key-value feature table; Hudi's CoW vs MoR choice adds operational complexity we didn't need at our scale",
+        "alternative_considered": "Apache Hudi with CoW — battle-tested but more opaque compaction and more configuration surface"
+      },
+      {
+        "decision": "Point-in-time joins at training time using time travel",
+        "reasoning": "The previous pipeline joined on current feature values, which meant a user's features at prediction time included information that wasn't available when the label was assigned — a leakage vector that inflated offline AUC but degraded online performance",
+        "alternative_considered": "Snapshot isolation via a separate historical features table — correct but doubled storage and required manual synchronization"
+      }
+    ],
+    "dead_ends": [
+      "Tried Feast as the feature store layer — its offline store abstraction added a serialization round-trip that was slower than reading Delta directly in Spark",
+      "Initial incremental design used window functions over the full event table with a WHERE clause on event_date — this still triggered a full scan because the partition predicate wasn't being pushed down through the window"
+    ],
+    "technologies": ["Apache Spark", "Delta Lake", "Python", "PySpark", "AWS S3", "AWS EMR", "MLflow", "scikit-learn"],
+    "patterns_used": ["Incremental materialization", "Feature store", "Point-in-time correct joins", "Time travel / data versioning", "Training-serving symmetry"],
+    "complexity_signals": {
+      "files_touched": 18,
+      "lines_changed": 940,
+      "test_coverage": true,
+      "debugging_involved": true
+    }
+  }
+}

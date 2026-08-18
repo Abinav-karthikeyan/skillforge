@@ -1,0 +1,34 @@
+{
+  "session_id": "fixture-refactor-001",
+  "timestamp": "2026-07-28T11:00:00.000Z",
+  "source_tool": "claude-code",
+  "summary": {
+    "one_liner": "Extracted the billing module from a Rails monolith into a standalone service behind a GraphQL facade, with a strangler fig migration to keep the monolith functional during the cutover",
+    "problem_statement": "The billing module was deeply entangled in the Rails monolith — 47 direct model associations, 12 background jobs, and a Stripe webhook handler all colocated with core domain models. Every billing change required a full monolith deploy, and a billing outage took down product features. Legal required SOC 2 audit isolation of billing data, which was impossible while billing tables lived in the shared database.",
+    "approach": "Applied the strangler fig pattern: new billing traffic routes to the standalone service while legacy billing paths in the monolith proxy through to it via an internal GraphQL API. Migrated data using a shadow-write phase (writes go to both DBs, reads from old) for 2 weeks, verified consistency with a daily reconciliation job, then cut reads over. Stripe webhooks now hit the billing service directly. The Rails monolith retains a thin billing facade that translates to GraphQL calls.",
+    "tradeoffs": [
+      {
+        "decision": "GraphQL internal API over REST",
+        "reasoning": "The billing module's data access patterns are query-heavy with variable field selection — GraphQL lets the monolith facade request exactly what it needs without overfetching, and the schema serves as a machine-readable contract",
+        "alternative_considered": "REST with OpenAPI spec — simpler tooling but would require versioning multiple endpoints as the schema evolved"
+      },
+      {
+        "decision": "2-week shadow-write phase before read cutover",
+        "reasoning": "A same-day cutover risked data inconsistency that would be invisible until a customer was charged incorrectly; the shadow write period gave us empirical proof of consistency before committing",
+        "alternative_considered": "Immediate cutover with a rollback plan — faster but any data loss would be customer-visible and harder to reverse than a planned migration"
+      }
+    ],
+    "dead_ends": [
+      "Tried using a database-level trigger to sync writes automatically — triggers added latency to every monolith write and were invisible to the ORM, causing subtle bugs in transaction rollback paths",
+      "Attempted to use ActiveRecord's multi-database support for dual-write — the abstraction didn't support writing to two different adapters (PG + PG) cleanly without a custom patch"
+    ],
+    "technologies": ["Ruby on Rails", "GraphQL", "PostgreSQL", "Stripe", "Sidekiq", "TypeScript", "Node.js"],
+    "patterns_used": ["Strangler fig", "Shadow write / dual write", "Data reconciliation", "Anti-corruption layer"],
+    "complexity_signals": {
+      "files_touched": 38,
+      "lines_changed": 2100,
+      "test_coverage": true,
+      "debugging_involved": true
+    }
+  }
+}

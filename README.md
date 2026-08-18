@@ -235,6 +235,59 @@ All three modes, separate files.
 
 ---
 
+## Custom instructions
+
+Career Mode injects your custom instructions into every translator system prompt — giving the LLM context it cannot infer from git alone.
+
+Add `custom_instructions` to `~/.career-mode/config.yaml`:
+
+```yaml
+# Simple: one string applies to all modes
+custom_instructions: >
+  I'm targeting Staff Engineer roles at fintech companies (Stripe, Plaid, Square).
+  Emphasize reliability, distributed systems, and compliance angles.
+  Tie every technical decision back to business impact.
+```
+
+```yaml
+# Per-mode: global applies everywhere, mode keys add overrides
+custom_instructions:
+  global: "Audience is senior engineers and EMs. Prefer precision over broad claims."
+  interview-qa: "Weight cross-team influence and leadership stories more heavily."
+  portfolio-bullet: "Lead with impact metrics. Format: Reduced X by Y, enabling Z."
+  technical-deep-dive: "Write for a principal-level audience; include explicit trade-off reasoning."
+```
+
+The instructions appear as a clearly delimited block at the end of the system prompt — they don't modify the prompt template files, so you can iterate them independently.
+
+---
+
+## Prompt eval
+
+Compare prompt versions across all fixtures to catch regressions before promoting a new version:
+
+```bash
+# Run all fixtures × all modes × all declared versions
+npx tsx scripts/prompt-eval.ts
+
+# Compare two versions on a single mode
+npx tsx scripts/prompt-eval.ts --versions v1,v2 --modes interview-qa
+
+# Limit to specific fixtures
+npx tsx scripts/prompt-eval.ts --fixtures debugging-memory-leak,greenfield-auth-service
+```
+
+Outputs land in `test-output/eval/<timestamp>/` (gitignored). Each file gets frontmatter with fixture name, mode, version, and elapsed time. Diff any two versions:
+
+```bash
+diff test-output/eval/<timestamp>/debugging-memory-leak/interview-qa-v1.md \
+     test-output/eval/<timestamp>/debugging-memory-leak/interview-qa-v2.md
+```
+
+To add a new prompt version: create `src/prompts/<mode>/v2.txt`, add it to `src/prompts/manifest.yaml`, then run eval before updating `active`.
+
+---
+
 ## Configuration
 
 `~/.career-mode/config.yaml` (global) or `<project-root>/career-mode.config.yaml` (project override — takes precedence):
@@ -273,6 +326,22 @@ output_dir: ~/.career-mode/artifacts
 # connector: notion             # also creates a Notion page with metadata
 # notion_token: ${NOTION_TOKEN}         # run `career-mode auth notion` to set up
 # notion_database_id: ${NOTION_DATABASE_ID}
+
+# Custom instructions — injected into every translator system prompt.
+# Give Career Mode context it can't infer from git: interview targets, tone, what to emphasize.
+#
+# Flat string (applies to all modes):
+# custom_instructions: >
+#   I'm targeting Staff Engineer roles at fintech companies.
+#   Emphasize reliability, distributed systems, and compliance angles.
+#   Tie technical decisions back to business impact and customer trust.
+#
+# Per-mode object:
+# custom_instructions:
+#   global: "Targeting infra/platform roles. Prefer precision over broad claims."
+#   interview-qa: "Weight cross-team influence and technical leadership stories."
+#   portfolio-bullet: "Lead with business-impact metrics. Format: Reduced X by Y, enabling Z."
+#   technical-deep-dive: "Write for a principal-level audience. Include explicit trade-off reasoning."
 ```
 
 ---
@@ -325,12 +394,13 @@ claude-code-integration/
   mcp/            # .mcp.json — reference MCP server registration
 
 tests/
-  fixtures/       # sample-session.json — realistic test fixture
+  fixtures/       # Realistic session fixtures for eval (rate limiter, auth service, memory leak, monolith extraction, ML pipeline)
 scripts/
   test-local.ts          # Smoke test: full pipeline against the fixture
   mcp-smoke-test.ts      # MCP protocol smoke test (spawns dist/mcp/server.js)
   test-share-notion.ts   # Targeted test: share_last_artifact → notion via MCP
   notion-setup.ts        # Manual database creation (non-interactive fallback)
+  prompt-eval.ts         # Prompt eval harness: runs fixtures × modes × versions for side-by-side comparison
 ```
 
 ---

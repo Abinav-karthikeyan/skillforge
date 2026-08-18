@@ -1,0 +1,39 @@
+{
+  "session_id": "fixture-greenfield-001",
+  "timestamp": "2026-06-30T09:00:00.000Z",
+  "source_tool": "claude-code",
+  "summary": {
+    "one_liner": "Designed and built a stateless JWT authentication service with refresh token rotation and Redis-backed revocation for a microservices platform",
+    "problem_statement": "The platform had no centralized auth — each service was doing its own session management with inconsistent approaches (some used JWTs, others server-side sessions, one used API keys). This made cross-service authorization impossible and meant a compromised credential in one service could not be revoked platform-wide.",
+    "approach": "Built a standalone auth service (Express + TypeScript) exposing /login, /refresh, and /revoke endpoints. Access tokens are short-lived JWTs (15 min) signed with RS256 using a rotating key pair. Refresh tokens are opaque UUIDs stored in Redis with TTL and a family ID for detecting token reuse (rotation invalidates the entire family on reuse). The public key is served on a /.well-known/jwks.json endpoint so downstream services can verify tokens without calling auth on every request.",
+    "tradeoffs": [
+      {
+        "decision": "RS256 over HS256 for JWT signing",
+        "reasoning": "RS256 lets downstream services verify tokens with only the public key — they never need the signing secret. HS256 would require distributing a shared secret to every service, creating a wide blast radius if leaked.",
+        "alternative_considered": "HS256 — simpler key management but incompatible with a zero-trust service boundary model"
+      },
+      {
+        "decision": "Refresh token family invalidation on reuse",
+        "reasoning": "If a refresh token is stolen and used, the legitimate user's next refresh attempt also fails — which triggers an alert rather than silently allowing the attacker to maintain access",
+        "alternative_considered": "Simple single-use tokens without family tracking — would fail the stolen-token attack scenario"
+      },
+      {
+        "decision": "Redis for refresh token store over a relational DB",
+        "reasoning": "Refresh token lookups are pure key-value (UUID → metadata) with TTL semantics; Redis handles this at microsecond latency and the TTL is a first-class feature",
+        "alternative_considered": "PostgreSQL with a cron-based cleanup job — works but adds operational complexity and slower expiry"
+      }
+    ],
+    "dead_ends": [
+      "Started with passport.js for the session strategy — removed it after realizing it was adding abstraction over a flow we needed full control of",
+      "Tried jose library for JWT operations before switching to jsonwebtoken — jose's async API made the refresh flow harder to test synchronously"
+    ],
+    "technologies": ["Node.js", "TypeScript", "Express", "Redis", "JWT", "RS256", "JWKS"],
+    "patterns_used": ["Stateless authentication", "Token rotation", "Refresh token family invalidation", "JWKS public key endpoint"],
+    "complexity_signals": {
+      "files_touched": 14,
+      "lines_changed": 680,
+      "test_coverage": true,
+      "debugging_involved": false
+    }
+  }
+}

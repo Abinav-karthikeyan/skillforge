@@ -14,7 +14,7 @@ Edit freely — this is your working doc, not a spec.
 | P2 | Demo GIF | ❌ Not started — record `career-mode auth notion` + generate flow |
 | P3 | Gist connector | ✅ Shipped (`src/output/connectors/gist.ts`, `share_last_artifact` tool) |
 | P4 | Tests + CI | ❌ Not started |
-| P4.5 | Prompt versioning + eval | 🟡 Half shipped — versioning done, fixture bank + `scripts/prompt-eval.ts` outstanding |
+| P4.5 | Prompt versioning + eval | ✅ Shipped — fixture bank (5 fixtures), `scripts/prompt-eval.ts`, `custom_instructions` config |
 | P5 | Dogfood publicly | ❌ Not started — do this **into Notion** so it validates P7.1 simultaneously |
 | P6 | Show HN launch | ⏸ Blocked on P2, P4 |
 | **P7** | **Destination connectors** (Notion, Linear/Jira, Obsidian, LinkedIn, Slack) | ✅ P7.1 Notion fully shipped and live-verified (see below) |
@@ -174,21 +174,15 @@ Deferred behind P7.1 + P5 because the strongest demo is `/career-mode` in Claude
 
 **Why.** The core thesis ("structured beats naive prompting") is architectural until the prompts are demonstrably good. Versioning is shipped (`manifest.yaml`, versioned dirs, `prompt_version` in frontmatter, `--prompt-version` CLI flag). What's outstanding is the empirical loop: a fixture bank + `scripts/prompt-eval.ts` so you can diff two prompt versions side-by-side.
 
-**Already shipped.**
-- `src/prompts/<mode>/v1.txt` layout
-- `manifest.yaml` with active version per mode
-- `loadPrompt` with override precedence (CLI flag > env > manifest)
-- `prompt_version` in artifact frontmatter
+**Status: ✅ Shipped (2026-08-18)**
 
-**Still to do.**
-- Grow the fixture bank: add ~4 more session fixtures covering different shapes (debugging-heavy, greenfield feature, refactor, ML/data). Currently there's one.
-- New `scripts/prompt-eval.ts`: takes fixtures × versions × modes, runs each, writes outputs to `test-output/eval/<timestamp>/<mode>-<version>/<fixture>.md` for side-by-side manual review.
+What shipped:
+- `src/prompts/<mode>/v1.txt` layout, `manifest.yaml`, `loadPrompt` with override precedence (CLI flag > env > manifest), `prompt_version` in artifact frontmatter
+- 5-fixture bank (`tests/fixtures/`): Redis rate limiter, auth service greenfield, Node.js memory leak debug, Rails monolith extraction, ML feature pipeline
+- `scripts/prompt-eval.ts` — runs fixtures × versions × modes, writes `test-output/eval/<timestamp>/<fixture>/<mode>-<version>.md` for side-by-side diff
+- `custom_instructions` config field — string or per-mode object, injected into every translator system prompt; enables curated per-role / per-company targeting without touching prompt template files
 
-**What's explicitly out of scope for the baseline.** Automated quality scoring (LLM-as-judge or heuristic rubric). Worth adding only after you have 2–3 versions and want regression signal.
-
-**Honest caveat.** An eval harness answers "did I regress?" — not "is this useful in a real interview?" The two questions need two loops: eval catches regressions, P5 dogfooding proves real-world value. Neither alone closes the empirical gap.
-
-**Done when.** `npx tsx scripts/prompt-eval.ts` produces a comparison folder you can diff two prompt versions in.
+**Not in scope.** Automated quality scoring (LLM-as-judge). Worth adding only after you have 2–3 versions and want regression signal; P5 dogfooding is the faster signal for now.
 
 **Notes.**
 -

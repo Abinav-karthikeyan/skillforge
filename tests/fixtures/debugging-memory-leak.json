@@ -1,0 +1,35 @@
+{
+  "session_id": "fixture-debugging-001",
+  "timestamp": "2026-07-14T14:30:00.000Z",
+  "source_tool": "claude-code",
+  "summary": {
+    "one_liner": "Tracked down and fixed a Node.js memory leak in a background job processor caused by uncleaned event listener registrations",
+    "problem_statement": "A long-running job processor service was consuming 600 MB of RAM after 48 hours and eventually OOMing. CloudWatch alarms fired every 2–3 days, requiring a manual restart. The leak had been open for 6 weeks with no one able to reproduce it locally.",
+    "approach": "Enabled --expose-gc and took heap snapshots with clinic.js before and after each job cycle. Identified that EventEmitter instances from a third-party queue client were accumulating in the retainedSize tree — each job run registered a new 'data' listener on a shared stream without ever removing it. Added explicit removeListener calls in the job teardown path and introduced a weak-ref pattern for the shared stream reference.",
+    "tradeoffs": [
+      {
+        "decision": "clinic.js over manual v8.writeHeapSnapshot",
+        "reasoning": "clinic.js flame/bubbleprof output is faster to interpret under time pressure — readable in a browser rather than loading a 200 MB .heapsnapshot into Chrome DevTools",
+        "alternative_considered": "Manual heap snapshot loop via v8 module — more portable but slower to iterate"
+      },
+      {
+        "decision": "removeListener at job teardown over using once() for initial registration",
+        "reasoning": "The listener needed to persist across sub-operations within a job; once() would have fired prematurely. Explicit teardown is more defensive for future callers who might reuse the stream.",
+        "alternative_considered": "Refactoring to once() — simpler but would require restructuring the job lifecycle significantly"
+      }
+    ],
+    "dead_ends": [
+      "Suspected a circular reference in the job payload serialization — added JSON.stringify depth limiting, no effect",
+      "Added --max-old-space-size=512 thinking it was a GC timing issue, confirmed this only delayed OOM, didn't fix it",
+      "Attempted to reproduce locally with a tight loop — couldn't trigger it because the leak only accumulated above ~200 concurrent in-flight jobs"
+    ],
+    "technologies": ["Node.js", "TypeScript", "clinic.js", "EventEmitter", "AWS CloudWatch", "SQS"],
+    "patterns_used": ["Heap snapshot analysis", "Weak reference pattern", "RAII-style teardown"],
+    "complexity_signals": {
+      "files_touched": 4,
+      "lines_changed": 85,
+      "test_coverage": true,
+      "debugging_involved": true
+    }
+  }
+}

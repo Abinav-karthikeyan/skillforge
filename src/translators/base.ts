@@ -2,6 +2,7 @@ import { readFileSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { parse } from "yaml";
+import type { CalibrationConfig, CustomInstructions } from "../types/config.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROMPTS_DIR = join(__dirname, "../prompts");
@@ -80,4 +81,39 @@ export function interpolate(
   vars: Record<string, string>
 ): string {
   return template.replace(/\{(\w+)\}/g, (_, key) => vars[key] ?? `{${key}}`);
+}
+
+/**
+ * Resolves the effective custom instruction string for a given mode from
+ * the CalibrationConfig, then appends it to the system prompt as a clearly
+ * delimited block. Returns the prompt unchanged if no instructions are set.
+ */
+export function applyCustomInstructions(
+  systemPrompt: string,
+  config: CalibrationConfig,
+  mode: "interview-qa" | "portfolio-bullet" | "technical-deep-dive"
+): string {
+  const ci = config.custom_instructions;
+  if (!ci) return systemPrompt;
+
+  const parts: string[] = [];
+
+  if (typeof ci === "string") {
+    parts.push(ci.trim());
+  } else {
+    if (ci.global) parts.push(ci.global.trim());
+    if (ci[mode]) parts.push((ci[mode] as string).trim());
+  }
+
+  if (parts.length === 0) return systemPrompt;
+
+  const block = [
+    "",
+    "---",
+    "Additional context from the user (apply throughout your response):",
+    ...parts.map((p) => p.replace(/^/gm, "  ")),
+    "---",
+  ].join("\n");
+
+  return systemPrompt + block;
 }

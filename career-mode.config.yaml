@@ -50,6 +50,33 @@ api_key: ${DEEPSEEK_API_KEY}            # put DEEPSEEK_API_KEY=sk-... in .env
 # company_size: startup                 # startup | mid | enterprise
 # default_mode: portfolio-bullet
 
+# Custom instructions — injected into every translator system prompt.
+# Use this to give Career Mode context it can't infer from git alone:
+# who you're interviewing with, what to emphasize, tone adjustments.
+#
+# Flat string (applies to all modes):
+# custom_instructions: >
+#   I'm targeting Staff Engineer roles at fintech companies (Stripe, Square, Plaid).
+#   Emphasize reliability, distributed systems, and compliance/security angles.
+#   Always tie technical decisions back to business impact and customer trust.
+#
+# Per-mode object (global + overrides):
+# custom_instructions:
+#   global: >
+#     Targeting infra/platform roles. Audience is senior engineers and EMs.
+#     Prefer precision over broad claims — "reduced P99 latency" over "improved performance".
+#   interview-qa: >
+#     Weight cross-team influence and technical leadership stories more heavily.
+#     For behavioural questions, surface the reasoning behind architectural choices,
+#     not just what was built.
+#   portfolio-bullet: >
+#     Lead with business-impact metrics where inferable.
+#     Preferred format: "Reduced X by Y, enabling Z" — not just action verbs.
+#   technical-deep-dive: >
+#     Write for a principal-level engineering audience.
+#     Include trade-off reasoning explicitly — why the chosen approach beats the
+#     alternatives, and what you'd do differently with more time.
+
 # Output connector — where generated artifacts are delivered:
 #   local (default): writes ~/.career-mode/artifacts/<file>.md and updates index.yml
 #   gist:            also pushes each artifact to a GitHub Gist (returns the URL);
