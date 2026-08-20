@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "career-mode": {
+    "skill-forge": {
       "command": "npx",
       "args": ["tsx", "/absolute/path/to/careermode-mcp/src/mcp/server.ts"],
       "env": {

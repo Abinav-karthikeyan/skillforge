@@ -33,11 +33,11 @@ Capture this coding session as a career artifact.
 }
 ```
 
-3. **Write the JSON** to `/tmp/career-mode-session.json`
+3. **Write the JSON** to a temp file outside the project (e.g. `/tmp/career-mode-session.json` on macOS/Linux, or `$env:TEMP\career-mode-session.json` on Windows).
 
 4. **Run the CLI**:
 ```bash
-npx career-mode generate --mode $MODE --json /tmp/career-mode-session.json
+npx @abhinavravich1999/skill-forge generate --mode $MODE --json /tmp/career-mode-session.json
 ```
 Where `$MODE` is one of: `interview-qa`, `portfolio-bullet`, `technical-deep-dive`, or `all`.
 Default to `portfolio-bullet` unless the user specifies.

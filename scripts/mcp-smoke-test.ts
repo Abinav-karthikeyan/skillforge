@@ -84,6 +84,7 @@ async function main() {
     "generate_career_artifact",
     "list_career_artifacts",
     "share_last_artifact",
+    "notion_auth_status",
   ].sort();
   console.log(`✓ tools/list returned: ${gotNames.join(", ")}`);
   if (JSON.stringify(gotNames) !== JSON.stringify(expectedNames)) {

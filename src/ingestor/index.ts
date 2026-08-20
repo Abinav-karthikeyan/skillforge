@@ -31,6 +31,8 @@ Given git history and diff information, produce a JSON object matching this sche
 Return ONLY valid JSON. No markdown fences, no explanation.`;
 
 function stripFences(text: string): string {
+  const fenced = /```(?:json)?\s*\n([\s\S]*?)\n```/.exec(text);
+  if (fenced) return fenced[1].trim();
   return text
     .replace(/^```(?:json)?\s*/m, "")
     .replace(/\s*```\s*$/m, "")

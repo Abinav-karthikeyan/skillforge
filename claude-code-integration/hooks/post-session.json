@@ -4,7 +4,7 @@
       {
         "matcher": "Bash",
         "pattern": "git commit",
-        "command": "npx career-mode generate --mode portfolio-bullet"
+        "command": "npx @abhinavravich1999/skill-forge generate --mode portfolio-bullet"
       }
     ]
   }

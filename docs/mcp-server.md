@@ -61,7 +61,7 @@ It speaks MCP over stdio — it isn't meant to be run standalone in a terminal f
 Project-scoped (`.mcp.json` in the project root) or via the CLI:
 
 ```bash
-claude mcp add career-mode -- npx tsx /absolute/path/to/careermode-mcp/src/mcp/server.ts
+claude mcp add skill-forge -- npx tsx /absolute/path/to/careermode-mcp/src/mcp/server.ts
 ```
 
 Or add directly to `.mcp.json`:
@@ -69,7 +69,7 @@ Or add directly to `.mcp.json`:
 ```json
 {
   "mcpServers": {
-    "career-mode": {
+    "skill-forge": {
       "command": "npx",
       "args": ["tsx", "/absolute/path/to/careermode-mcp/src/mcp/server.ts"],
       "env": { "ANTHROPIC_API_KEY": "sk-ant-..." }
@@ -90,7 +90,7 @@ Same as the CLI — the server reads `career-mode.config.yaml` (project root, th
 
 Implemented, typechecked, and verified two ways:
 - `scripts/mcp-smoke-test.ts` spawns the built server and drives it through the MCP client SDK: `initialize` → `tools/list` → `list_career_artifacts` → a real `generate_career_artifact` call.
-- Registered with Claude Code directly (`claude mcp add career-mode -- node dist/mcp/server.js`); `claude mcp get career-mode` reports `✔ Connected`.
+- Registered with Claude Code directly (`claude mcp add skill-forge -- node dist/mcp/server.js`); `claude mcp get skill-forge` reports `✔ Connected`.
 
 One build gotcha this surfaced: `tsc` doesn't copy `src/prompts/*.txt` into `dist/` on its own — the `build` script now does that explicitly (`npm run build`). If you see `ENOENT ... dist/prompts/*.txt`, rebuild.
 

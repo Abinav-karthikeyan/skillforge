@@ -1,5 +1,9 @@
 # Career Mode
 
+[![npm version](https://img.shields.io/npm/v/@abhinavravich1999/skill-forge)](https://www.npmjs.com/package/@abhinavravich1999/skill-forge)
+[![CI](https://github.com/Abinav-karthikeyan/skillforge/actions/workflows/ci.yml/badge.svg)](https://github.com/Abinav-karthikeyan/skillforge/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 > Your sessions already contain your best career stories. Career Mode extracts them before you forget.
 
 You just spent four hours debugging a race condition, or designed a provider abstraction that handles five LLM backends, or ripped out legacy auth middleware because legal flagged a compliance gap. In a week you'll remember "fixed some bug." In six months, nothing. Interviews and resumes are reconstructed from faded memory, months after the specifics vanished.
@@ -395,6 +399,9 @@ claude-code-integration/
 
 tests/
   fixtures/       # Realistic session fixtures for eval (rate limiter, auth service, memory leak, monolith extraction, ML pipeline)
+  ingestor.test.ts, renderer.test.ts, mcp-server.test.ts
+  connectors/     # local-file, gist (mocked fetch), notion (mocked client), notion-blocks
+  translators/    # prompt loading, version resolution, interpolation, custom instructions
 scripts/
   test-local.ts          # Smoke test: full pipeline against the fixture
   mcp-smoke-test.ts      # MCP protocol smoke test (spawns dist/mcp/server.js)
@@ -405,10 +412,24 @@ scripts/
 
 ---
 
+## Development & testing
+
+```bash
+npm install
+npm run build       # tsc + copies prompt templates into dist/
+npm test            # Vitest — unit tests (ingestor, renderer, prompts, connectors) + MCP integration test
+npm run typecheck   # tsc --noEmit over src + tests
+```
+
+The MCP integration test (`tests/mcp-server.test.ts`) spawns `dist/mcp/server.js` over stdio and asserts the full tool surface — run `npm run build` before it. CI runs build → test → typecheck on Node 20 and 22, Ubuntu and Windows.
+
+---
+
 ## Status
 
 v0.1 — working, weekend-built. Tested on:
 
+- Automated test suite: 50 Vitest tests across 8 files (ingestor, renderer, prompt loader/version resolution, local/gist/notion connectors, MCP server integration) + GitHub Actions CI on Node 20/22, Ubuntu/Windows
 - Anthropic API (Claude Sonnet), Ollama (local, no key), DeepSeek via `openai-compatible`
 - `/career-mode` slash command path end-to-end
 - CLI (`generate`, `list`, `share`, `auth notion`, `auth status`) against real APIs
