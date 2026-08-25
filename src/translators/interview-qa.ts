@@ -4,6 +4,7 @@ import { callClaude } from "../claude/client.js";
 import { SessionSummary, TranslatorOutput } from "../types/session.js";
 import { CalibrationConfig } from "../types/config.js";
 import { loadPrompt, interpolate, applyCustomInstructions } from "./base.js";
+import { runFocusScout, renderFocusBlock, FocusRunResult } from "../orchestrator/focus.js";
 
 const StarAnswerSchema = z.object({
   situation: z.string(),
@@ -78,16 +79,44 @@ function stripFences(text: string): string {
     .trim();
 }
 
+export interface InterviewQAOptions {
+  promptVersion?: string;
+  focusOverride?: string | string[];
+}
+
 export async function translateInterviewQA(
   client: LLMClient,
   session: SessionSummary,
   config: CalibrationConfig,
-  promptVersion?: string
+  optionsOrVersion?: string | InterviewQAOptions
 ): Promise<TranslatorOutput> {
-  const { content: template, version } = loadPrompt("interview-qa", promptVersion);
+  const opts: InterviewQAOptions =
+    typeof optionsOrVersion === "string"
+      ? { promptVersion: optionsOrVersion }
+      : optionsOrVersion ?? {};
+
+  const effectiveFocus = opts.focusOverride ?? config.focus;
+  const { content: template, version } = loadPrompt("interview-qa", opts.promptVersion);
+
+  let scoutResult: FocusRunResult = { brief: null, fallback_reason: "no-focus" };
+  if (effectiveFocus) {
+    scoutResult = await runFocusScout(client, session, effectiveFocus, config);
+    if (scoutResult.fallback_reason && scoutResult.fallback_reason !== "no-focus") {
+      // Surface degradations so users know the pipeline fell back rather than
+      // silently ignoring their focus.
+      console.warn(
+        `[focus] scout fallback: ${scoutResult.fallback_reason}` +
+          (scoutResult.elapsed_ms !== undefined ? ` (${scoutResult.elapsed_ms}ms)` : "")
+      );
+    }
+  }
+
+  const focusBlock = renderFocusBlock(scoutResult.brief, effectiveFocus);
+
   const basePrompt = interpolate(template, {
     experience_level: config.experience_level,
     session_summary_json: JSON.stringify(session.summary, null, 2),
+    focus_brief_block: focusBlock,
   });
   const systemPrompt = applyCustomInstructions(basePrompt, config, "interview-qa");
 

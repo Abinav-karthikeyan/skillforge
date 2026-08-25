@@ -39,10 +39,16 @@ async function runTranslator(
   client: LLMClient,
   session: SessionSummary,
   config: CalibrationConfig,
-  promptVersion?: string
+  promptVersion?: string,
+  focus?: string | string[]
 ): Promise<TranslatorOutput> {
   if (mode === "portfolio-bullet") return translatePortfolioBullet(client, session, config, promptVersion);
-  if (mode === "interview-qa") return translateInterviewQA(client, session, config, promptVersion);
+  if (mode === "interview-qa") {
+    return translateInterviewQA(client, session, config, {
+      promptVersion,
+      focusOverride: focus,
+    });
+  }
   return translateTechnicalDeepDive(client, session, config, promptVersion);
 }
 
@@ -74,13 +80,25 @@ server.registerTool(
         .string()
         .optional()
         .describe("Prompt version to use (e.g. 'v2'). Falls back to CAREER_MODE_PROMPT_VERSION env var, then manifest active version."),
+      focus: z
+        .union([z.string(), z.array(z.string())])
+        .optional()
+        .describe(
+          "Interview-qa only: focus lens (e.g. 'system-design tradeoffs', 'cross-team influence'). " +
+            "Triggers the focus-scout subagent under the configured focus_effort budget."
+        ),
+      focus_effort: z
+        .enum(["low", "medium", "off"])
+        .optional()
+        .describe("Focus subagent budget tier. Defaults to config.focus_effort or 'low'."),
     },
   },
-  async ({ mode, session_summary, output_dir, connector, prompt_version }) => {
+  async ({ mode, session_summary, output_dir, connector, prompt_version, focus, focus_effort }) => {
     try {
       const config = loadCalibration();
       if (output_dir) config.output_dir = output_dir;
       if (connector) config.connector = connector;
+      if (focus_effort) config.focus_effort = focus_effort;
 
       const client = createClient({
         provider: config.provider,
@@ -106,7 +124,7 @@ server.registerTool(
 
       const sections: string[] = [];
       for (const m of modes) {
-        const output = await runTranslator(m, client, session, config, prompt_version);
+        const output = await runTranslator(m, client, session, config, prompt_version, focus);
         const location = await writer.write(output, session);
         sections.push(`### ${m}\nWritten to: ${location}\n\n${output.content}`);
       }

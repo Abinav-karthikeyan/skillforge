@@ -39,7 +39,22 @@ export interface CalibrationConfig {
   notion_property_map?: Record<string, string>;
   // Custom instructions injected into every translator prompt
   custom_instructions?: CustomInstructions;
+  // Focus subagent — interview-qa only. `focus` is the user's lens ("system-design tradeoffs",
+  // "cross-team influence"). `focus_effort` gates how much budget the orchestrator gives the
+  // pre-translator brief call. `focus_deadline_ms` is a wall-clock safety net; on timeout the
+  // pipeline falls back to plain string injection so generation never blocks.
+  focus?: string | string[];
+  focus_effort?: FocusEffort;
+  focus_deadline_ms?: number;
+  // Which subagent runtime to use for orchestrator-spawned turns (currently
+  // only the focus scout). "auto" and unknown values resolve to the inline
+  // runtime; "claude-sdk" / "openai-agents" are reserved for SDK-backed
+  // implementations that will register in src/orchestrator/subagent/factory.ts.
+  subagent_runtime?: SubagentRuntimeSelection;
 }
+
+export type FocusEffort = "low" | "medium" | "off";
+export type SubagentRuntimeSelection = "auto" | "inline" | "claude-sdk" | "openai-agents";
 
 export const DEFAULT_CALIBRATION: CalibrationConfig = {
   experience_level: "senior",

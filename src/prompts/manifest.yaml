@@ -9,10 +9,23 @@
 # To add a new version: create <mode>/v<N>.txt and add it here.
 
 interview-qa:
-  active: v1
+  active: v2
   versions:
     v1:
       notes: "Initial STAR-format prompt with calibration hints"
+      tuned_against: "claude-sonnet-4-6"
+    v2:
+      notes: "Adds optional focus-brief slot for orchestrator-driven subagent guidance"
+      tuned_against: "claude-sonnet-4-6"
+
+focus-brief:
+  active: v2
+  versions:
+    v1:
+      notes: "Focus-scout subagent: emits category weights + gaps/signals from focus lens"
+      tuned_against: "claude-sonnet-4-6"
+    v2:
+      notes: "Adds tool-loop protocol (grep / read_file / list_files / git_log) for repo-grounded scouting"
       tuned_against: "claude-sonnet-4-6"
 
 portfolio-bullet:

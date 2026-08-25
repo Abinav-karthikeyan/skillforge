@@ -31,6 +31,9 @@ program
   .option("-o, --output-dir <dir>", "Output directory (overrides config)")
   .option("-c, --connector <name>", `Connector: ${listConnectors().join(" | ")} (overrides config)`)
   .option("-p, --prompt-version <version>", "Prompt version to use (e.g. v2). Falls back to manifest active version.")
+  .option("-f, --focus <text...>", "Focus lens for interview-qa mode (repeatable). Triggers the focus-scout subagent pass.")
+  .option("--focus-effort <level>", "Focus subagent budget: low | medium | off (default: low, or config.focus_effort)")
+  .option("--focus-deadline-ms <ms>", "Wall-clock deadline for the focus subagent call before graceful fallback")
   .action(async (opts) => {
     try {
       const config = loadCalibration();
@@ -43,6 +46,20 @@ program
 
       if (opts.outputDir) config.output_dir = opts.outputDir;
       if (opts.connector) config.connector = opts.connector;
+      if (opts.focus && opts.focus.length > 0) config.focus = opts.focus;
+      if (opts.focusEffort) {
+        if (!["low", "medium", "off"].includes(opts.focusEffort)) {
+          throw new Error(`--focus-effort must be one of: low, medium, off (got "${opts.focusEffort}")`);
+        }
+        config.focus_effort = opts.focusEffort;
+      }
+      if (opts.focusDeadlineMs) {
+        const ms = Number(opts.focusDeadlineMs);
+        if (!Number.isFinite(ms) || ms <= 0) {
+          throw new Error(`--focus-deadline-ms must be a positive number (got "${opts.focusDeadlineMs}")`);
+        }
+        config.focus_deadline_ms = ms;
+      }
 
       let rawJson: string | undefined;
       if (opts.json) {
@@ -62,7 +79,9 @@ program
         if (mode === "portfolio-bullet") {
           output = await translatePortfolioBullet(client, session, config, opts.promptVersion);
         } else if (mode === "interview-qa") {
-          output = await translateInterviewQA(client, session, config, opts.promptVersion);
+          output = await translateInterviewQA(client, session, config, {
+            promptVersion: opts.promptVersion,
+          });
         } else {
           output = await translateTechnicalDeepDive(client, session, config, opts.promptVersion);
         }

@@ -44,7 +44,7 @@ describe("interpolate", () => {
 
 describe("resolvePromptVersion", () => {
   it("returns the manifest active version by default", () => {
-    expect(resolvePromptVersion("interview-qa")).toBe("v1");
+    expect(resolvePromptVersion("interview-qa")).toBe("v2");
     expect(resolvePromptVersion("portfolio-bullet")).toBe("v1");
     expect(resolvePromptVersion("technical-deepdive")).toBe("v1");
   });
@@ -78,7 +78,7 @@ describe("resolvePromptVersion", () => {
 
   it("ignores an env override that matches no mode and no version", () => {
     withEnv("CAREER_MODE_PROMPT_VERSION", "bogus", () => {
-      expect(resolvePromptVersion("interview-qa")).toBe("v1");
+      expect(resolvePromptVersion("interview-qa")).toBe("v2");
     });
   });
 
