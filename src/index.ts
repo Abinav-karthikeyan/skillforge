@@ -2,8 +2,8 @@
 import "./config/preload-env.js"; // must be the first import — loads .env before anything else
 import { Command } from "commander";
 import { readFileSync } from "fs";
-import { homedir } from "os";
 import { join } from "path";
+import { resolveArtifactsDir } from "./config/paths.js";
 import { createClient, ProviderConfig } from "./claude/client.js";
 import { loadCalibration } from "./config/calibration.js";
 import { ingestSession } from "./ingestor/index.js";
@@ -102,8 +102,7 @@ program
   .action((opts) => {
     try {
       const config = loadCalibration();
-      const dir = opts.outputDir ?? config.output_dir ?? "~/.career-mode/artifacts";
-      const resolved = dir.startsWith("~") ? join(homedir(), dir.slice(2)) : dir;
+      const resolved = resolveArtifactsDir(opts.outputDir ?? config.output_dir);
       const indexPath = join(resolved, "index.yml");
 
       try {

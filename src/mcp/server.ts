@@ -15,7 +15,7 @@ import { NotionConnector } from "../output/connectors/notion.js";
 import { readLastArtifact } from "../output/last-artifact.js";
 import { readFileSync } from "fs";
 import { join } from "path";
-import { homedir } from "os";
+import { resolveArtifactsDir } from "../config/paths.js";
 import { SessionSummarySchema, TranslationMode, TranslatorOutput } from "../types/session.js";
 import { SessionSummary } from "../types/session.js";
 import { CalibrationConfig } from "../types/config.js";
@@ -151,8 +151,7 @@ server.registerTool(
   async ({ output_dir }) => {
     try {
       const config = loadCalibration();
-      const dir = output_dir ?? config.output_dir ?? "~/.career-mode/artifacts";
-      const resolved = dir.startsWith("~") ? join(homedir(), dir.slice(2)) : dir;
+      const resolved = resolveArtifactsDir(output_dir ?? config.output_dir);
       const indexPath = join(resolved, "index.yml");
 
       try {

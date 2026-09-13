@@ -3,6 +3,7 @@ import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { parse } from "yaml";
 import type { CalibrationConfig, CustomInstructions } from "../types/config.js";
+import { promptVersionFromEnv, PROMPT_VERSION_ENV } from "../config/paths.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROMPTS_DIR = join(__dirname, "../prompts");
@@ -44,14 +45,14 @@ export function resolvePromptVersion(
     return explicitVersion;
   }
 
-  const envOverride = process.env.CAREER_MODE_PROMPT_VERSION;
+  const envOverride = promptVersionFromEnv();
   if (envOverride) {
     if (envOverride.includes("@")) {
       const [mode, ver] = envOverride.split("@");
       if (mode === name) {
         if (!available.includes(ver)) {
           throw new Error(
-            `Env CAREER_MODE_PROMPT_VERSION specifies unknown version "${ver}" for "${name}". Available: ${available.join(", ")}`
+            `Env ${PROMPT_VERSION_ENV} specifies unknown version "${ver}" for "${name}". Available: ${available.join(", ")}`
           );
         }
         return ver;

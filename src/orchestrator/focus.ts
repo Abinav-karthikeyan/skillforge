@@ -7,6 +7,7 @@ import { SubagentRuntime, SUBAGENT_TIMEOUT_MESSAGE } from "./subagent/types.js";
 import { createSubagentRuntime } from "./subagent/factory.js";
 import { buildScoutTools } from "./subagent/tools/registry.js";
 import { ToolDef } from "./subagent/tools/types.js";
+import { promptVersionFromEnv } from "../config/paths.js";
 
 // ── Budget table ───────────────────────────────────────────────────────────
 // Naive char-based token estimate (~4 chars/token). Kept in-house to avoid a
@@ -129,7 +130,7 @@ export async function runFocusScout(
   // Explicit CAREER_MODE_PROMPT_VERSION overrides both.
   const wantsTools = budget.max_tool_calls > 0;
   const tools: ToolDef[] = wantsTools ? buildScoutTools() : [];
-  const promptVersion = process.env.CAREER_MODE_PROMPT_VERSION
+  const promptVersion = promptVersionFromEnv()
     ? undefined
     : wantsTools
       ? "v2"

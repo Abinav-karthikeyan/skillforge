@@ -1,7 +1,7 @@
 import { readFileSync } from "fs";
 import { join } from "path";
-import { homedir } from "os";
 import { parse } from "yaml";
+import { resolveArtifactsDir } from "../config/paths.js";
 
 export interface LastArtifact {
   filename: string;
@@ -16,17 +16,12 @@ export interface LastArtifact {
   };
 }
 
-function resolveOutputDir(outputDir?: string): string {
-  const dir = outputDir ?? "~/.career-mode/artifacts";
-  return dir.startsWith("~") ? join(homedir(), dir.slice(2)) : dir;
-}
-
 /**
  * Reads index.yml from the artifacts dir, returns the most recently written entry
  * along with its rendered markdown. Throws with a helpful message if no artifacts exist.
  */
 export function readLastArtifact(outputDir?: string): LastArtifact {
-  const resolved = resolveOutputDir(outputDir);
+  const resolved = resolveArtifactsDir(outputDir);
   const indexPath = join(resolved, "index.yml");
 
   let indexRaw: string;

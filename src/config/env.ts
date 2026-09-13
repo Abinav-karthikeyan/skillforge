@@ -1,7 +1,7 @@
 import { config as dotenvConfig } from "dotenv";
 import { existsSync } from "fs";
 import { join } from "path";
-import { homedir } from "os";
+import { envPath } from "./paths.js";
 
 /**
  * Load environment variables from .env files. Called once at process start
@@ -18,7 +18,7 @@ import { homedir } from "os";
 export function loadDotenvFiles(): void {
   const candidates = [
     join(process.cwd(), ".env"),
-    join(homedir(), ".career-mode", ".env"),
+    envPath(),
   ];
 
   for (const path of candidates) {

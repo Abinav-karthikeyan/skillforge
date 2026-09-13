@@ -33,3 +33,37 @@ jobs:
 
       - name: Typecheck
         run: npm run typecheck
+
+  pack-smoke:
+    name: Pack-install smoke — Node ${{ matrix.node }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        node: [20, 22]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      # Pack the tarball, install it globally, and drive the published binaries
+      # by name — the same path a user gets from `npm i -g @…/skill-forge`.
+      # `shell: bash` runs on both Ubuntu and Windows runners so one script covers
+      # the matrix; the global npm prefix is already on PATH via setup-node.
+      - name: Pack, global-install, and smoke the binaries
+        shell: bash
+        run: |
+          TARBALL=$(npm pack | tail -1)
+          echo "packed: $TARBALL"
+          npm i -g "./$TARBALL"
+          node scripts/pack-smoke.mjs
