@@ -53,11 +53,19 @@ function* walk(root: string, dir: string): Generator<string> {
 function matchesGlob(relPath: string, glob: string): boolean {
   // Minimal glob: supports `**`, `*`, and literal segments. Sufficient for
   // scout use ("src/**/*.ts", "*.md"); we're not shipping a full matcher.
+  //
+  // `**/` matches zero or more directory segments, so "src/**/*.ts" matches a
+  // file directly in src/ as well as nested ones, and the default "**/*"
+  // matches root-level files. `*` stays within a single segment. Placeholders
+  // keep the star rewrites from colliding while we substitute.
   const escaped = glob
-    .replace(/[.+^${}()|[\]\\]/g, "\\$&")
-    .replace(/\*\*/g, "::DOUBLESTAR::")
-    .replace(/\*/g, "[^/\\\\]*")
-    .replace(/::DOUBLESTAR::/g, ".*");
+    .replace(/[.+^${}()|[\]\\]/g, "\\$&") // escape regex metachars (not * or /)
+    .replace(/\*\*\//g, "::GLOBSTAR_SLASH::") // ** + slash → zero or more dirs
+    .replace(/\*\*/g, "::GLOBSTAR::") // bare ** → anything, crossing dirs
+    .replace(/\*/g, "::STAR::") // * → within one segment
+    .replace(/::GLOBSTAR_SLASH::/g, "(?:[^/]+/)*")
+    .replace(/::GLOBSTAR::/g, ".*")
+    .replace(/::STAR::/g, "[^/]*");
   const normalized = relPath.split(sep).join("/");
   return new RegExp(`^${escaped}$`).test(normalized);
 }

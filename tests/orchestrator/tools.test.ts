@@ -71,10 +71,19 @@ describe("scout tools — grep / list", () => {
     expect(out).not.toContain("src/b.ts"); // no NEEDLE
   });
 
-  it("grep descends into subdirectories with a ** glob", async () => {
+  it("** matches both nested files and direct children of the prefix", async () => {
     const grep = tool(buildScoutTools(root), "grep");
     const out = await grep.handler({ pattern: "NEEDLE", glob: "src/**/*.ts" });
-    expect(out).toContain("src/nested/c.ts");
+    expect(out).toContain("src/nested/c.ts"); // nested
+    expect(out).toContain("src/a.ts"); // direct child — the ** zero-dirs case
+  });
+
+  it("the default **/* glob matches root-level files", async () => {
+    const grep = tool(buildScoutTools(root), "grep");
+    // README.md sits at the repo root; the default glob must reach it.
+    const out = await grep.handler({ pattern: "NEEDLE", glob: "**/*" });
+    expect(out).toContain("README.md");
+    expect(out).toContain("src/a.ts");
   });
 
   it("grep reports no matches cleanly", async () => {
