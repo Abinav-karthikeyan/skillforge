@@ -1,6 +1,7 @@
 import { LLMClient, ProviderName } from "./types.js";
 import { AnthropicProvider } from "./providers/anthropic.js";
 import { OpenAICompatibleProvider } from "./providers/openai-compatible.js";
+import { DEFAULT_MODELS } from "./models.js";
 
 export interface ProviderConfig {
   provider?: ProviderName;
@@ -10,7 +11,6 @@ export interface ProviderConfig {
 }
 
 const OLLAMA_BASE_URL = "http://localhost:11434/v1";
-const OLLAMA_DEFAULT_MODEL = "llama3.2";
 
 export function createClient(config: ProviderConfig = {}): LLMClient {
   const provider = config.provider ?? inferProviderFromEnv();
@@ -22,13 +22,13 @@ export function createClient(config: ProviderConfig = {}): LLMClient {
     case "ollama":
       return new OpenAICompatibleProvider({
         baseURL: config.base_url ?? OLLAMA_BASE_URL,
-        model: config.model ?? OLLAMA_DEFAULT_MODEL,
+        model: config.model ?? DEFAULT_MODELS.ollama,
         apiKey: "ollama",
       });
 
     case "openai":
       return new OpenAICompatibleProvider({
-        model: config.model ?? "gpt-4o-mini",
+        model: config.model ?? DEFAULT_MODELS.openai,
         apiKey: config.api_key ?? process.env.OPENAI_API_KEY,
       });
 

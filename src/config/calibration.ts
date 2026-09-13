@@ -1,11 +1,10 @@
 import { readFileSync, existsSync } from "fs";
-import { join } from "path";
-import { homedir } from "os";
 import { parse } from "yaml";
 import {
   CalibrationConfig,
   DEFAULT_CALIBRATION,
 } from "../types/config.js";
+import { projectConfigPath, configYamlPath } from "./paths.js";
 
 const SECRET_FIELDS = ["api_key", "gist_token", "notion_token", "notion_database_id"];
 
@@ -25,8 +24,8 @@ function resolveEnvRef(value: string, fieldName: string): string {
 
 export function loadCalibration(): CalibrationConfig {
   const candidates = [
-    join(process.cwd(), "career-mode.config.yaml"),
-    join(homedir(), ".career-mode", "config.yaml"),
+    projectConfigPath(),
+    configYamlPath(),
   ];
 
   for (const p of candidates) {
@@ -40,6 +39,13 @@ export function loadCalibration(): CalibrationConfig {
         return { ...DEFAULT_CALIBRATION, ...parsed };
       } catch (err) {
         if (err instanceof Error && err.message.includes("references env var")) throw err;
+        // Malformed YAML (or similar) should not silently vanish — warn to
+        // stderr (safe for the MCP stdio channel) and fall through to the next
+        // candidate / built-in defaults, so a typo is visible rather than
+        // mysteriously ignored.
+        console.warn(
+          `skill-forge: could not parse config at ${p}: ${(err as Error).message}. Falling back to defaults.`
+        );
       }
     }
   }

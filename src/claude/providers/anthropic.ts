@@ -1,11 +1,12 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { LLMClient } from "../types.js";
+import { DEFAULT_MODELS } from "../models.js";
 
 export class AnthropicProvider implements LLMClient {
   private client: Anthropic;
   private model: string;
 
-  constructor(apiKey?: string, model = "claude-sonnet-4-6") {
+  constructor(apiKey?: string, model: string = DEFAULT_MODELS.anthropic) {
     const key = apiKey ?? process.env.ANTHROPIC_API_KEY;
     if (!key) {
       throw new Error(

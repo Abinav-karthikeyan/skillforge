@@ -1,15 +1,11 @@
-import { mkdirSync, writeFileSync, existsSync, readFileSync, appendFileSync } from "fs";
+import { mkdirSync, writeFileSync, appendFileSync } from "fs";
 import { join } from "path";
-import { homedir } from "os";
+import { stringify } from "yaml";
 import { SessionSummary, TranslatorOutput } from "../../types/session.js";
 import { renderMarkdown } from "../renderer.js";
 import { CareerModeConnector } from "./types.js";
 import { registerConnector } from "./registry.js";
-
-function resolveOutputDir(outputDir?: string): string {
-  const dir = outputDir ?? "~/.career-mode/artifacts";
-  return dir.startsWith("~") ? join(homedir(), dir.slice(2)) : dir;
-}
+import { resolveArtifactsDir } from "../../config/paths.js";
 
 function slugify(text: string): string {
   return text
@@ -29,7 +25,7 @@ export class LocalFileConnector implements CareerModeConnector {
   private outputDir: string;
 
   constructor(outputDir?: string) {
-    this.outputDir = resolveOutputDir(outputDir);
+    this.outputDir = resolveArtifactsDir(outputDir);
   }
 
   async write(output: TranslatorOutput, session: SessionSummary): Promise<string> {
@@ -51,14 +47,20 @@ export class LocalFileConnector implements CareerModeConnector {
     filename: string
   ): void {
     const indexPath = join(this.outputDir, "index.yml");
-    const entry = [
-      `- session_id: ${session.session_id}`,
-      `  mode: ${output.mode}`,
-      `  timestamp: ${output.timestamp}`,
-      `  file: ${filename}`,
-      `  one_liner: "${session.summary.one_liner.replace(/"/g, '\\"')}"`,
-      "",
-    ].join("\n");
+    // Serialize via the YAML library rather than hand-building the string: a
+    // one_liner containing a quote, colon, or newline would otherwise corrupt
+    // the index that `readLastArtifact` parses back. Each entry is emitted as a
+    // single-element sequence (`- key: …`); appended blocks concatenate into
+    // one valid YAML sequence, preserving the per-write append semantics.
+    const entry = stringify([
+      {
+        session_id: session.session_id,
+        mode: output.mode,
+        timestamp: output.timestamp,
+        file: filename,
+        one_liner: session.summary.one_liner,
+      },
+    ]);
 
     appendFileSync(indexPath, entry, "utf-8");
   }

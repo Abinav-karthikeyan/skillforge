@@ -1,6 +1,7 @@
 import { mkdtempSync, readFileSync, existsSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
+import { parse } from "yaml";
 import { afterEach, describe, expect, it } from "vitest";
 import { LocalFileConnector } from "../../src/output/connectors/local-file.js";
 import { SessionSummary, TranslatorOutput } from "../../src/types/session.js";
@@ -85,14 +86,18 @@ describe("LocalFileConnector", () => {
     expect(index).toContain("Second artifact");
   });
 
-  it("escapes double quotes in the one_liner written to index.yml", async () => {
+  it("safely round-trips a one_liner with YAML-hostile characters", async () => {
     const dir = makeTempDir();
     const connector = new LocalFileConnector(dir);
 
-    await connector.write(makeOutput(), makeSession('Built a "smart" limiter'));
+    // Quote, colon, and newline would all corrupt a hand-built YAML string.
+    const hostile = 'Built a "smart" limiter: v2\nwith a wrapped line';
+    await connector.write(makeOutput(), makeSession(hostile));
 
     const index = readFileSync(join(dir, "index.yml"), "utf-8");
-    expect(index).toContain('one_liner: "Built a \\"smart\\" limiter"');
+    const entries = parse(index) as Array<{ one_liner: string }>;
+    expect(entries).toHaveLength(1);
+    expect(entries[0].one_liner).toBe(hostile);
   });
 
   it("creates nested output directories on demand", async () => {
