@@ -79,6 +79,15 @@ Or run without installing:
 npx @abhinavravich1999/skill-forge generate --help
 ```
 
+> **Upgrading from `career-mode`?** This release renames everything to `skill-forge`, with
+> one-release fallbacks so nothing breaks: your existing `~/.career-mode/` corpus and
+> `career-mode.config.yaml` are still read, the `CAREER_MODE_PROMPT_VERSION` env var still
+> works, and the old MCP tool names (`generate_career_artifact`, `list_career_artifacts`)
+> still resolve (deprecated — switch to the `*_skill_forge_*` names). The one thing to do by
+> hand: if you installed the old slash command, delete `~/.claude/commands/career-mode.md`
+> and install `/skill-forge` (step 3) so you don't have both. These fallbacks are removed in
+> the next release.
+
 ### 2. Configure your LLM provider
 
 skill-forge has its own LLM client, independent of whatever powers your Claude Code session. The recommended path is `openai-compatible` — it works with DeepSeek, Groq, Together, Fireworks, xAI, LM Studio, vLLM, Ollama, and OpenAI itself.
