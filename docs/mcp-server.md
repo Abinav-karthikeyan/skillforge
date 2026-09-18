@@ -19,8 +19,22 @@ Use the CLI for scripting and CI. Use the slash command if you're only ever in C
 | `mode` | `"interview-qa" \| "portfolio-bullet" \| "technical-deep-dive" \| "all"` | Default `portfolio-bullet` |
 | `session_summary` | object (optional) | Structured session context — `summary.one_liner`, `problem_statement`, `approach`, `tradeoffs`, `dead_ends`, `technologies`, `patterns_used`, `complexity_signals`. Omit to fall back to summarizing local `git log`/`git diff`. |
 | `output_dir` | string (optional) | Overrides the configured output directory. |
+| `connector` | string (optional) | `local` (default), `gist`, `notion`, or `return_only`. See host-delivery below. |
 
 Returns the rendered markdown for each generated mode plus the file path it was written to.
+
+#### Host-delivery mode (`connector: "return_only"`)
+
+Set `connector` to `return_only` to make skill-forge **write the artifact to the local
+corpus** (so `index.yml` and the typed bank stay intact) **and return the fully rendered
+markdown to the caller** with a destination-agnostic delivery instruction — instead of
+pushing anywhere itself. The *host* then delivers it using a connector the user has already
+authorized, so skill-forge never holds those credentials.
+
+This is the plan's connector strategy (`plan_ahead.md` Bet 2): zero credentials to maintain,
+and it gets better every time a host adds a connector — with no skill-forge release. Example
+targets: a Slack post, a LinkedIn draft, a Google Doc, or a **NotebookLM / Gemini-Notebook**
+MCP's `add_source(type=text)` — the returned markdown is passed verbatim as a text source.
 
 ### `list_career_artifacts`
 

@@ -10,6 +10,7 @@ import { translatePortfolioBullet } from "../translators/portfolio-bullet.js";
 import { translateInterviewQA } from "../translators/interview-qa.js";
 import { translateTechnicalDeepDive } from "../translators/technical-deep-dive.js";
 import { createConnector, listConnectors } from "../output/connectors/factory.js";
+import { RETURN_ONLY, formatReturnOnly } from "../output/return-only.js";
 import { GistConnector } from "../output/connectors/gist.js";
 import { NotionConnector } from "../output/connectors/notion.js";
 import { readLastArtifact } from "../output/last-artifact.js";
@@ -122,11 +123,16 @@ server.registerTool(
       const modes: TranslationMode[] =
         mode === "all" ? ["interview-qa", "portfolio-bullet", "technical-deep-dive"] : [mode];
 
+      const returnOnly = config.connector === RETURN_ONLY;
       const sections: string[] = [];
       for (const m of modes) {
         const output = await runTranslator(m, client, session, config, prompt_version, focus);
         const location = await writer.write(output, session);
-        sections.push(`### ${m}\nWritten to: ${location}\n\n${output.content}`);
+        sections.push(
+          returnOnly
+            ? formatReturnOnly(output, session, location)
+            : `### ${m}\nWritten to: ${location}\n\n${output.content}`
+        );
       }
 
       return { content: [{ type: "text", text: sections.join("\n\n---\n\n") }] };

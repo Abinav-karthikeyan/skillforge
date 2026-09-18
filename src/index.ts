@@ -11,6 +11,7 @@ import { translatePortfolioBullet } from "./translators/portfolio-bullet.js";
 import { translateInterviewQA } from "./translators/interview-qa.js";
 import { translateTechnicalDeepDive } from "./translators/technical-deep-dive.js";
 import { createConnector, listConnectors } from "./output/connectors/factory.js";
+import { RETURN_ONLY, formatReturnOnly } from "./output/return-only.js";
 import { GistConnector } from "./output/connectors/gist.js";
 import { readLastArtifact } from "./output/last-artifact.js";
 import { TranslationMode } from "./types/session.js";
@@ -87,7 +88,12 @@ program
         }
 
         const filepath = await connector.write(output, session);
-        console.log(`✓ ${mode}: ${filepath}`);
+        if (config.connector === RETURN_ONLY) {
+          console.log(formatReturnOnly(output, session, filepath));
+          console.log("");
+        } else {
+          console.log(`✓ ${mode}: ${filepath}`);
+        }
       }
     } catch (err) {
       console.error("Error:", (err as Error).message);
