@@ -88,22 +88,28 @@ then calls the NotebookLM MCP's `add_source(type=text)` with it.
 - Verifying *before* building saved us from shipping a fragile, plan-violating connector.
 - Reusing `LocalFileConnector` kept the diff tiny and the corpus/index behavior identical.
 
+**Went well (added 2026-09-18, dogfood):**
+- **End-to-end round-trip verified against a real NotebookLM MCP.** Using
+  `notebooklm-mcp-cli` (v0.11.5): `generate --connector return_only` → `nlm notebook create`
+  → `nlm source add <id> --text "$(cat <corpus artifact>)" --wait`. The source ingested
+  (`status: 2`, `type: generated_text`) and a grounded `nlm notebook query` answered while
+  **citing our artifact verbatim**. The `--text` flag is exactly the `add_source(type=text)`
+  path the design targeted. Notebook: `b793d536-7b23-4171-90fe-2ad17cac6708`.
+
 **Watch out for:**
-- **We did not end-to-end test against a real NotebookLM MCP.** We verified from
-  documentation that `add_source(type=text)` exists and accepts markdown. The last mile —
-  a real host actually calling it with our returned content — is unverified. That's the
-  natural next step (see below).
 - **The delivery instruction is a prompt, not an enforced contract.** A host *might* ignore
   it. That's inherent to host-delivery; it's the trade-off for holding no credentials.
+- **Mode choice affects grounding depth.** The dogfood used `portfolio-bullet` (terse
+  bullets); a grounded query for the *why* behind the design got a thin answer because that
+  rationale isn't in short bullets. For a notebook meant to answer "why" questions, prefer
+  `technical-deep-dive` or `interview-qa` — the round-trip is identical, the content is richer.
 
 ---
 
 ## 5. Suggested next steps (in order)
 
-1. **End-to-end smoke with a real NotebookLM MCP** — install `jacob-bd/notebooklm-mcp-cli`,
-   run `generate … --connector return_only`, and hand the output to its `source_add` to
-   confirm the round-trip. This closes the plan's open "host-delivery reality check" risk
-   with evidence, not docs.
+1. ~~**End-to-end smoke with a real NotebookLM MCP**~~ — **DONE 2026-09-18** (see
+   Retrospection above). Round-trip verified with a grounded, cited query.
 2. **Consider making `return_only` the documented default for "share to X" flows** in the
    README, alongside the existing Notion/Gist connectors.
 3. **Bet 6 (LLM-as-judge)** is the next small, high-value plan item if you want to keep
