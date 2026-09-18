@@ -61,7 +61,7 @@ This typed contract is what makes translators swappable. Adding a new output mod
 
 **Translators** are per-mode LLM calls against versioned prompt templates. Prompt quality is iterable independently of code — pin a version, A/B test, roll back. A skill's prompt is frozen in the `.md` file.
 
-**Connectors** are swappable output destinations. `local` writes `.md` files and maintains `index.yml`. `gist` pushes each artifact to a GitHub Gist and returns a shareable URL. `notion` creates a page in a Notion database with structured properties. All non-local connectors also write locally so `index.yml` stays authoritative.
+**Connectors** are swappable output destinations. `local` writes `.md` files and maintains `index.yml`. `gist` pushes each artifact to a GitHub Gist and returns a shareable URL. `notion` creates a page in a Notion database with structured properties. `return_only` writes locally **and returns the fully rendered artifact to the caller** so the *host* delivers it via a connector it already has — Slack, LinkedIn, Google Docs, or a **Gemini Notebook / NotebookLM** source (see [Connect to Gemini Notebook](#7-optional-connect-to-gemini-notebook--notebooklm)). All non-local connectors also write locally so `index.yml` stays authoritative.
 
 ---
 
@@ -198,6 +198,53 @@ npx tsx scripts/notion-setup.ts <parent-page-id>
 
 </details>
 
+### 7. (Optional) Connect to Gemini Notebook / NotebookLM
+
+Push artifacts into a **Gemini Notebook** (formerly NotebookLM) so you can chat over your own
+career corpus with grounded, cited answers.
+
+There is a deliberate design choice here: Career Mode does **not** ship a Gemini Notebook
+connector that holds your Google credentials. Google exposes no official consumer write API,
+so a bespoke connector would mean Career Mode driving a headless Chrome with your cookies —
+fragile and a credential liability. Instead, Career Mode uses **host-delivery**: it renders the
+artifact and hands it back, and a NotebookLM MCP that *you* have authorized does the delivery.
+Career Mode holds zero Google credentials.
+
+**One-time setup** — install a NotebookLM MCP CLI (any that exposes an `add_source` / `source add`
+tool with a text/paste type works; [`notebooklm-mcp-cli`](https://github.com/jacob-bd/notebooklm-mcp-cli)
+is one) and authenticate it once:
+
+```bash
+pip install notebooklm-mcp-cli
+nlm login                         # opens Chrome; sign into your Google account once
+nlm notebook create "My career corpus"    # prints a notebook id + URL
+```
+
+**Deliver an artifact** — generate with the `return_only` connector, then hand the rendered
+markdown to the notebook as a text source:
+
+```bash
+# 1. Render + return (also saved to your local corpus)
+career-mode generate --mode technical-deep-dive --connector return_only --json session.json
+
+# 2. Add the saved artifact to the notebook as a text source
+nlm source add <notebook-id> --text "$(cat ~/.career-mode/artifacts/<file>.md)" \
+  --title "Career artifact" --wait
+```
+
+Inside an MCP host (Claude Code, Claude Desktop) that has *both* Career Mode and a NotebookLM
+MCP connected, this is one sentence: *"generate a technical deep-dive and add it to my Gemini
+Notebook."* The host calls `generate_career_artifact` with `connector: "return_only"`, gets the
+markdown back, and calls the NotebookLM MCP's `add_source(type=text)` with it — no glue code.
+
+> **Verified round-trip:** `generate --connector return_only` → `nlm source add --text` ingests
+> cleanly and a grounded query answers while citing the artifact. `technical-deep-dive` and
+> `interview-qa` ground richer "why" questions than terse `portfolio-bullet`; the flow is
+> identical across modes.
+
+The same `return_only` mode is the recommended path for Slack, LinkedIn, and Google Docs too —
+wherever the host already holds the credential.
+
 ---
 
 ## Using the slash command
@@ -330,6 +377,9 @@ output_dir: ~/.career-mode/artifacts
 # connector: notion             # also creates a Notion page with metadata
 # notion_token: ${NOTION_TOKEN}         # run `career-mode auth notion` to set up
 # notion_database_id: ${NOTION_DATABASE_ID}
+# connector: return_only        # writes locally AND returns the rendered artifact so the
+#                               # host delivers it (Gemini Notebook, Slack, LinkedIn, Docs).
+#                               # Holds zero third-party credentials — see the README.
 
 # Custom instructions — injected into every translator system prompt.
 # Give Career Mode context it can't infer from git: interview targets, tone, what to emphasize.
@@ -364,6 +414,9 @@ career-mode list
 
 # Push the most recent artifact to a GitHub Gist
 career-mode share
+
+# Host-delivery: render + return the artifact for the host to deliver (Gemini Notebook, Slack, …)
+career-mode generate --mode technical-deep-dive --connector return_only --json session.json
 
 # Override output directory
 career-mode generate --mode all --output-dir ./my-artifacts
@@ -429,7 +482,7 @@ The MCP integration test (`tests/mcp-server.test.ts`) spawns `dist/mcp/server.js
 
 v0.1 — working, weekend-built. Tested on:
 
-- Automated test suite: 50 Vitest tests across 8 files (ingestor, renderer, prompt loader/version resolution, local/gist/notion connectors, MCP server integration) + GitHub Actions CI on Node 20/22, Ubuntu/Windows
+- Automated test suite: 74 Vitest tests across 11 files (ingestor, renderer, prompt loader/version resolution, local/gist/notion connectors, return_only host-delivery, orchestrator/scout, MCP server integration) + GitHub Actions CI on Node 20/22, Ubuntu/Windows
 - Anthropic API (Claude Sonnet), Ollama (local, no key), DeepSeek via `openai-compatible`
 - `/career-mode` slash command path end-to-end
 - CLI (`generate`, `list`, `share`, `auth notion`, `auth status`) against real APIs
@@ -437,6 +490,7 @@ v0.1 — working, weekend-built. Tested on:
 - `.env` loading with `${VAR}` config indirection, verified by `scripts/deepseek-smoke-test.ts`
 - Gist connector — offline (mocked fetch) and live via the MCP `share_last_artifact` tool
 - Notion connector — live end-to-end: `generate --connector notion` (both `interview-qa` and `portfolio-bullet`), `share_last_artifact --destination notion` via MCP; properties (Title, Mode, Technologies, Date, Patterns) all populated
+- `return_only` host-delivery — live end-to-end into **Gemini Notebook / NotebookLM** via `notebooklm-mcp-cli`: `generate --connector return_only` → `nlm source add --text` (both `portfolio-bullet` and `technical-deep-dive`); source ingested and a grounded query answered while citing the artifact
 
 Not yet tested end-to-end:
 - OpenAI direct provider (`provider: openai` — the `openai-compatible` path with `base_url: https://api.openai.com/v1` is equivalent and works)
