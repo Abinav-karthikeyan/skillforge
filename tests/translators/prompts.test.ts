@@ -24,7 +24,10 @@ function withEnv(key: string, value: string | undefined, fn: () => void) {
   }
 }
 
-afterEach(() => delete process.env.CAREER_MODE_PROMPT_VERSION);
+afterEach(() => {
+  delete process.env.SKILL_FORGE_PROMPT_VERSION;
+  delete process.env.CAREER_MODE_PROMPT_VERSION;
+});
 
 describe("interpolate", () => {
   it("replaces known placeholders", () => {
@@ -57,33 +60,47 @@ describe("resolvePromptVersion", () => {
     expect(() => resolvePromptVersion("interview-qa", "v99")).toThrow(/Unknown version/);
   });
 
-  it("honors a global CAREER_MODE_PROMPT_VERSION env override", () => {
-    withEnv("CAREER_MODE_PROMPT_VERSION", "v1", () => {
+  it("honors a global SKILL_FORGE_PROMPT_VERSION env override", () => {
+    withEnv("SKILL_FORGE_PROMPT_VERSION", "v1", () => {
       expect(resolvePromptVersion("interview-qa")).toBe("v1");
     });
   });
 
-  it("honors a per-mode CAREER_MODE_PROMPT_VERSION env override", () => {
-    withEnv("CAREER_MODE_PROMPT_VERSION", "interview-qa@v1", () => {
+  it("honors a per-mode SKILL_FORGE_PROMPT_VERSION env override", () => {
+    withEnv("SKILL_FORGE_PROMPT_VERSION", "interview-qa@v1", () => {
       expect(resolvePromptVersion("interview-qa")).toBe("v1");
       expect(resolvePromptVersion("portfolio-bullet")).toBe("v1");
     });
   });
 
+  it("still honors the legacy CAREER_MODE_PROMPT_VERSION env var (one-release fallback)", () => {
+    withEnv("CAREER_MODE_PROMPT_VERSION", "v1", () => {
+      expect(resolvePromptVersion("interview-qa")).toBe("v1");
+    });
+  });
+
+  it("prefers SKILL_FORGE_PROMPT_VERSION over the legacy CAREER_MODE_PROMPT_VERSION", () => {
+    withEnv("CAREER_MODE_PROMPT_VERSION", "v2", () => {
+      withEnv("SKILL_FORGE_PROMPT_VERSION", "v1", () => {
+        expect(resolvePromptVersion("interview-qa")).toBe("v1");
+      });
+    });
+  });
+
   it("throws when the env override names an unknown version for a mode", () => {
-    withEnv("CAREER_MODE_PROMPT_VERSION", "interview-qa@v99", () => {
+    withEnv("SKILL_FORGE_PROMPT_VERSION", "interview-qa@v99", () => {
       expect(() => resolvePromptVersion("interview-qa")).toThrow(/[Uu]nknown version/);
     });
   });
 
   it("ignores an env override that matches no mode and no version", () => {
-    withEnv("CAREER_MODE_PROMPT_VERSION", "bogus", () => {
+    withEnv("SKILL_FORGE_PROMPT_VERSION", "bogus", () => {
       expect(resolvePromptVersion("interview-qa")).toBe("v2");
     });
   });
 
   it("prefers an explicit version over the env override", () => {
-    withEnv("CAREER_MODE_PROMPT_VERSION", "v99", () => {
+    withEnv("SKILL_FORGE_PROMPT_VERSION", "v99", () => {
       expect(resolvePromptVersion("interview-qa", "v1")).toBe("v1");
     });
   });

@@ -1,16 +1,16 @@
-# Career Mode configuration
-# Copy this file to your project root or ~/.career-mode/config.yaml
+# skill-forge configuration
+# Copy this file to your project root or ~/.skill-forge/config.yaml
 
 experience_level: senior       # junior | mid | senior | staff
 tone: balanced                 # technical | business | balanced
-output_dir: ~/.career-mode/artifacts
+output_dir: ~/.skill-forge/artifacts
 
 # LLM provider — the recommended path is `openai-compatible`, which works with
 # any endpoint that speaks the OpenAI Chat Completions API (DeepSeek, Groq,
 # Together, Fireworks, xAI, LM Studio, vLLM, Ollama, and OpenAI itself).
 #
 # The api_key field supports ${VAR} indirection — put the actual key in a .env
-# file (project root or ~/.career-mode/.env, both gitignored) and reference the
+# file (project root or ~/.skill-forge/.env, both gitignored) and reference the
 # env var here. This keeps secrets out of the yaml.
 
 # ── DeepSeek (recommended for cost/quality) ───────────────────────────────────
@@ -51,7 +51,7 @@ api_key: ${DEEPSEEK_API_KEY}            # put DEEPSEEK_API_KEY=sk-... in .env
 # default_mode: portfolio-bullet
 
 # Custom instructions — injected into every translator system prompt.
-# Use this to give Career Mode context it can't infer from git alone:
+# Use this to give skill-forge context it can't infer from git alone:
 # who you're interviewing with, what to emphasize, tone adjustments.
 #
 # Flat string (applies to all modes):
@@ -78,12 +78,12 @@ api_key: ${DEEPSEEK_API_KEY}            # put DEEPSEEK_API_KEY=sk-... in .env
 #     alternatives, and what you'd do differently with more time.
 
 # Output connector — where generated artifacts are delivered:
-#   local (default): writes ~/.career-mode/artifacts/<file>.md and updates index.yml
+#   local (default): writes ~/.skill-forge/artifacts/<file>.md and updates index.yml
 #   gist:            also pushes each artifact to a GitHub Gist (returns the URL);
 #                    still writes locally so index.yml and `share` keep working
 # connector: local
 #
-# Gist settings (only used when connector: gist, or with `career-mode share`):
+# Gist settings (only used when connector: gist, or with `skill-forge share`):
 # gist_token: ghp_...                   # or set GITHUB_TOKEN env var (needs `gist` scope)
 # gist_public: false                    # default false → secret gist
 

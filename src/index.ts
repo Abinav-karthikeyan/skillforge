@@ -116,7 +116,7 @@ program
         console.log(content);
       } catch {
         console.log(`No artifacts found at ${resolved}`);
-        console.log("Run `career-mode generate` to create your first artifact.");
+        console.log("Run `skill-forge generate` to create your first artifact.");
       }
     } catch (err) {
       console.error("Error:", (err as Error).message);
@@ -142,7 +142,7 @@ program
       const url = await gist.createGist(
         last.filename,
         last.markdown,
-        `Career Mode — ${last.entry.mode} — ${last.entry.one_liner}`
+        `skill-forge — ${last.entry.mode} — ${last.entry.one_liner}`
       );
       console.log(`✓ Shared: ${url}`);
       console.log(`  Source: ${last.filepath}`);
@@ -159,7 +159,7 @@ const authCmd = program
 
 authCmd
   .command("notion")
-  .description("Connect Career Mode to a Notion workspace (interactive setup)")
+  .description("Connect skill-forge to a Notion workspace (interactive setup)")
   .action(async () => {
     try {
       await authNotion();
@@ -177,7 +177,7 @@ authCmd
     const notionDbId = process.env.NOTION_DATABASE_ID;
     const notion = notionToken && notionDbId
       ? `✓ notion   database: ${notionDbId.slice(0, 8)}…`
-      : "✗ notion   not configured — run: career-mode auth notion";
+      : "✗ notion   not configured — run: skill-forge auth notion";
     const gist = process.env.GITHUB_TOKEN
       ? `✓ gist     token set`
       : "✗ gist     not configured — set GITHUB_TOKEN in .env";

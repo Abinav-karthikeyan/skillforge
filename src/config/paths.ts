@@ -1,10 +1,14 @@
 /**
  * Single source of truth for every user-global path, config filename, and the
  * prompt-version env var. Before this module those strings were duplicated
- * across ~10 files; centralizing them is P0.1 Increment A — a pure refactor
- * that changes no behavior. Increment B then flips the historical
- * `career-mode` names to `skill-forge` (with a one-release read-fallback) by
- * editing *this file only*.
+ * across ~10 files; centralizing them was P0.1 Increment A.
+ *
+ * Increment B (this file) flips the historical `career-mode` names to
+ * `skill-forge`. Each flip carries a ONE-RELEASE read-fallback so existing
+ * users' `~/.career-mode/` data, `career-mode.config.yaml`, and
+ * `CAREER_MODE_PROMPT_VERSION` env var keep working. The fallbacks live here
+ * and only here — delete the `LEGACY_*` constants and the existence checks in
+ * the next release to complete the migration.
  *
  * Leaf module: depends on `os`/`path` only, so anything may import it without
  * risking a cycle.
@@ -13,9 +17,22 @@ import { existsSync, mkdirSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
 
-/** The user-global config directory (holds `.env`, `config.yaml`, `artifacts/`). */
+const CONFIG_DIRNAME = ".skill-forge";
+/** One-release read-fallback: existing installs keep using `~/.career-mode/`. */
+const LEGACY_CONFIG_DIRNAME = ".career-mode";
+
+/**
+ * The user-global config directory (holds `.env`, `config.yaml`, `artifacts/`).
+ * Prefers `~/.skill-forge/`, but if only the legacy `~/.career-mode/` exists it
+ * is returned unchanged so an existing user's data is not orphaned. Fresh
+ * installs always get the new directory.
+ */
 export function configDir(): string {
-  return join(homedir(), ".career-mode");
+  const preferred = join(homedir(), CONFIG_DIRNAME);
+  if (existsSync(preferred)) return preferred;
+  const legacy = join(homedir(), LEGACY_CONFIG_DIRNAME);
+  if (existsSync(legacy)) return legacy;
+  return preferred;
 }
 
 /** `configDir()`, created if missing. Returned so callers can write into it. */
@@ -36,19 +53,30 @@ export function configYamlPath(): string {
 }
 
 /** Basename of the project-local config file. */
-export const CONFIG_FILENAME = "career-mode.config.yaml";
+export const CONFIG_FILENAME = "skill-forge.config.yaml";
+/** One-release read-fallback for the project-local config filename. */
+const LEGACY_CONFIG_FILENAME = "career-mode.config.yaml";
 
-/** Path to the project-local config file in the current working directory. */
+/**
+ * Path to the project-local config file in the current working directory.
+ * Prefers `skill-forge.config.yaml`; falls back to the legacy
+ * `career-mode.config.yaml` if only that exists.
+ */
 export function projectConfigPath(): string {
-  return join(process.cwd(), CONFIG_FILENAME);
+  const preferred = join(process.cwd(), CONFIG_FILENAME);
+  if (existsSync(preferred)) return preferred;
+  const legacy = join(process.cwd(), LEGACY_CONFIG_FILENAME);
+  if (existsSync(legacy)) return legacy;
+  return preferred;
 }
 
 /**
- * The default artifacts directory, kept as a leading-`~` string so it stays
- * serializable as a config default. Use `resolveArtifactsDir()` to get an
- * absolute path.
+ * The default artifacts directory as a serializable leading-`~` string, used
+ * only when writing a fresh config file. Runtime resolution goes through
+ * `resolveArtifactsDir()`, which derives the path from `configDir()` so it
+ * honors the legacy-directory fallback.
  */
-export const DEFAULT_ARTIFACTS_DIR = "~/.career-mode/artifacts";
+export const DEFAULT_ARTIFACTS_DIR = "~/.skill-forge/artifacts";
 
 /** Expand a leading `~/` to the user's home directory; pass through otherwise. */
 export function expandTilde(p: string): string {
@@ -56,21 +84,27 @@ export function expandTilde(p: string): string {
 }
 
 /**
- * Resolve an artifacts directory to an absolute path, falling back to the
- * default when no preference is given.
+ * Resolve an artifacts directory to an absolute path. An explicit preference
+ * (CLI flag or config `output_dir`) wins; otherwise the default is derived from
+ * `configDir()` so it follows the legacy `~/.career-mode/` fallback rather than
+ * a hardcoded new-dir string.
  */
 export function resolveArtifactsDir(preferred?: string): string {
-  return expandTilde(preferred ?? DEFAULT_ARTIFACTS_DIR);
+  if (preferred) return expandTilde(preferred);
+  return join(configDir(), "artifacts");
 }
 
 /** Name of the env var that overrides the active prompt version. */
-export const PROMPT_VERSION_ENV = "CAREER_MODE_PROMPT_VERSION";
+export const PROMPT_VERSION_ENV = "SKILL_FORGE_PROMPT_VERSION";
+/** One-release alias for the prompt-version env var. */
+const LEGACY_PROMPT_VERSION_ENV = "CAREER_MODE_PROMPT_VERSION";
 
 /**
  * Read the prompt-version override from the environment. Returns the raw value
  * (which may be a bare version like `v2` or a per-mode `interview-qa@v1`), or
- * `undefined` when unset. Increment B aliases the successor var name here.
+ * `undefined` when unset. The successor var wins; the legacy var is still
+ * honored for one release.
  */
 export function promptVersionFromEnv(): string | undefined {
-  return process.env[PROMPT_VERSION_ENV];
+  return process.env[PROMPT_VERSION_ENV] ?? process.env[LEGACY_PROMPT_VERSION_ENV];
 }

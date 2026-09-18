@@ -52,7 +52,7 @@ if (!/No artifacts found/.test(list)) fail(`list did not report an empty artifac
 console.log("✓ skill-forge list (empty dir)");
 
 // ── 3. MCP tools/list handshake ─────────────────────────────────────────────
-const REQUIRED_TOOL = "generate_career_artifact";
+const REQUIRED_TOOL = "generate_skill_forge_artifact";
 const mcpTimeoutMs = 15_000;
 
 const mcpResult = await new Promise((resolve) => {

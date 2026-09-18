@@ -19,10 +19,14 @@ const DIST_SERVER = join(__dirname, "../dist/mcp/server.js");
 const hasDist = existsSync(DIST_SERVER);
 
 const EXPECTED_TOOLS = [
-  "generate_career_artifact",
-  "list_career_artifacts",
+  // Current names
+  "generate_skill_forge_artifact",
+  "list_skill_forge_artifacts",
   "notion_auth_status",
   "share_last_artifact",
+  // Deprecated aliases kept for one release (see src/config/paths.ts migration window)
+  "generate_career_artifact",
+  "list_career_artifacts",
 ].sort();
 
 // Cold start (especially under a synced node_modules) can exceed Vitest's default 5s timeout.
@@ -60,7 +64,21 @@ describe.skipIf(!hasDist)("MCP server (dist/mcp/server.js)", () => {
   );
 
   it(
-    "responds to list_career_artifacts without an LLM call",
+    "responds to list_skill_forge_artifacts without an LLM call",
+    async () => {
+      const result = await client.callTool(
+        { name: "list_skill_forge_artifacts", arguments: { output_dir: "no-such-dir" } },
+        undefined,
+        { timeout: REQUEST_TIMEOUT }
+      );
+      const text = JSON.stringify(result.content);
+      expect(text).toContain("No artifacts found");
+    },
+    REQUEST_TIMEOUT
+  );
+
+  it(
+    "still responds to the deprecated list_career_artifacts alias",
     async () => {
       const result = await client.callTool(
         { name: "list_career_artifacts", arguments: { output_dir: "no-such-dir" } },

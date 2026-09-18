@@ -1,5 +1,4 @@
 import { ProviderName } from "../claude/types.js";
-import { DEFAULT_ARTIFACTS_DIR } from "../config/paths.js";
 
 /**
  * Free-form instructions appended to every translator system prompt.
@@ -60,5 +59,6 @@ export type SubagentRuntimeSelection = "auto" | "inline" | "claude-sdk" | "opena
 export const DEFAULT_CALIBRATION: CalibrationConfig = {
   experience_level: "senior",
   tone: "balanced",
-  output_dir: DEFAULT_ARTIFACTS_DIR,
+  // output_dir intentionally unset: resolveArtifactsDir() derives the default
+  // from configDir() so it honors the legacy `~/.career-mode/` fallback.
 };

@@ -2,7 +2,7 @@
 /**
  * DeepSeek smoke test — verifies the openai-compatible provider path against a
  * real DeepSeek endpoint. Requires DEEPSEEK_API_KEY in .env (project root or
- * ~/.career-mode/.env) OR exported in the shell.
+ * ~/.skill-forge/.env) OR exported in the shell.
  *
  * Two modes:
  *
@@ -41,8 +41,8 @@ const DEEPSEEK_CONFIG = [
 async function runOffline() {
   console.log("→ offline mode: verifying config resolution and provider wiring\n");
 
-  const smokeCwd = mkdtempSync(join(tmpdir(), "career-mode-deepseek-"));
-  writeFileSync(join(smokeCwd, "career-mode.config.yaml"), DEEPSEEK_CONFIG, "utf-8");
+  const smokeCwd = mkdtempSync(join(tmpdir(), "skill-forge-deepseek-"));
+  writeFileSync(join(smokeCwd, "skill-forge.config.yaml"), DEEPSEEK_CONFIG, "utf-8");
   writeFileSync(join(smokeCwd, ".env"), "DEEPSEEK_API_KEY=sk-fake-test-key-12345\n", "utf-8");
 
   const savedCwd = process.cwd();

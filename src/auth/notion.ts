@@ -1,5 +1,5 @@
 /**
- * Interactive Notion authentication flow for `career-mode auth notion`.
+ * Interactive Notion authentication flow for `skill-forge auth notion`.
  *
  * Style: gh auth login — one linear prompt sequence, masked token input,
  * live API validation at each step, atomic writes at the end.
@@ -9,9 +9,9 @@
  *   2. Prompt for integration token (masked, never logged)
  *   3. Validate token → show integration name
  *   4. Search for pages the integration can see → let user pick, or paste a URL
- *   5. Create the Career Mode Artifacts database via raw fetch
- *   6. Write NOTION_TOKEN + NOTION_DATABASE_ID to ~/.career-mode/.env
- *   7. Write connector settings to ~/.career-mode/config.yaml
+ *   5. Create the skill-forge Artifacts database via raw fetch
+ *   6. Write NOTION_TOKEN + NOTION_DATABASE_ID to the user-global .env
+ *   7. Write connector settings to the user-global config.yaml
  *   8. Print confirmation and next command
  */
 
@@ -143,7 +143,7 @@ async function createDatabase(token: string, parentPageId: string): Promise<{ id
     },
     body: JSON.stringify({
       parent: { type: "page_id", page_id: parentPageId },
-      title: [{ type: "text", text: { content: "Career Mode Artifacts" } }],
+      title: [{ type: "text", text: { content: "skill-forge Artifacts" } }],
       properties: {
         Title: { title: {} },
         Mode: {
@@ -190,7 +190,7 @@ function extractPageId(raw: string): string | null {
 // ── Main flow ────────────────────────────────────────────────────────────────
 
 export async function authNotion(): Promise<void> {
-  console.log("\nConnecting Career Mode to Notion");
+  console.log("\nConnecting skill-forge to Notion");
   console.log("─".repeat(40));
 
   // 1. Check existing auth
@@ -237,7 +237,7 @@ export async function authNotion(): Promise<void> {
     console.log("Share at least one page with your integration first:");
     console.log("  1. Open a Notion page");
     console.log("  2. Click ··· → Connections → add your integration");
-    console.log('\nThen re-run: career-mode auth notion\n');
+    console.log('\nThen re-run: skill-forge auth notion\n');
     process.exit(0);
   }
 
@@ -265,7 +265,7 @@ export async function authNotion(): Promise<void> {
   }
 
   // 5. Create the database
-  process.stdout.write(`Creating "Career Mode Artifacts" database… `);
+  process.stdout.write(`Creating "skill-forge Artifacts" database… `);
   let db: { id: string; url: string };
   try {
     db = await createDatabase(token, parentPageId);
@@ -290,9 +290,9 @@ export async function authNotion(): Promise<void> {
   // 8. Confirmation
   const maskedToken = `ntn_…${token.slice(-4)}`;
   console.log(`\n✓ Authenticated as ${workspaceName}`);
-  console.log(`  Token:    ${maskedToken}  → ~/.career-mode/.env`);
+  console.log(`  Token:    ${maskedToken}  → ~/.skill-forge/.env`);
   console.log(`  Database: ${db.id}`);
   console.log(`  URL:      ${db.url}`);
   console.log(`\nArtifacts will now sync to Notion. Try it:`);
-  console.log(`  career-mode generate --mode portfolio-bullet`);
+  console.log(`  skill-forge generate --mode portfolio-bullet`);
 }

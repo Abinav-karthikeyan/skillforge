@@ -1,9 +1,9 @@
-# Career Mode prompt manifest
+# skill-forge prompt manifest
 # Each mode declares its active version and all available versions.
 #
 # Override precedence (highest first):
 #   1. --prompt-version CLI flag / prompt_version MCP arg
-#   2. CAREER_MODE_PROMPT_VERSION env var (global "v2" or per-mode "interview-qa@v2")
+#   2. SKILL_FORGE_PROMPT_VERSION env var (global "v2" or per-mode "interview-qa@v2")
 #   3. active field below
 #
 # To add a new version: create <mode>/v<N>.txt and add it here.

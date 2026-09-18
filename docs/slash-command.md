@@ -1,6 +1,6 @@
-# `/career-mode` slash command
+# `/skill-forge` slash command
 
-The `/career-mode` slash command is a Claude Code skill that captures the current session's context and translates it into career artifacts without leaving the terminal.
+The `/skill-forge` slash command is a Claude Code skill that captures the current session's context and translates it into career artifacts without leaving the terminal.
 
 ## Why the slash command, not just the hook?
 
@@ -26,13 +26,13 @@ Copy the sample config:
 
 ```bash
 # macOS / Linux
-cp career-mode.config.yaml ~/.career-mode/config.yaml
+cp skill-forge.config.yaml ~/.skill-forge/config.yaml
 
 # Windows
-Copy-Item career-mode.config.yaml "$env:USERPROFILE\.career-mode\config.yaml"
+Copy-Item skill-forge.config.yaml "$env:USERPROFILE\.skill-forge\config.yaml"
 ```
 
-Edit `~/.career-mode/config.yaml` and uncomment your provider:
+Edit `~/.skill-forge/config.yaml` and uncomment your provider:
 
 ```yaml
 experience_level: senior   # junior | mid | senior | staff
@@ -54,17 +54,17 @@ Claude Code loads slash commands from `~/.claude/commands/` (global) or `.claude
 
 ```bash
 # macOS / Linux — global install (available in every session)
-cp claude-code-integration/commands/career-mode.md ~/.claude/commands/career-mode.md
+cp claude-code-integration/commands/skill-forge.md ~/.claude/commands/skill-forge.md
 
 # Windows
-Copy-Item claude-code-integration\commands\career-mode.md "$env:USERPROFILE\.claude\commands\career-mode.md"
+Copy-Item claude-code-integration\commands\skill-forge.md "$env:USERPROFILE\.claude\commands\skill-forge.md"
 ```
 
-**Restart Claude Code** after copying. The `/career-mode` command will appear in autocomplete.
+**Restart Claude Code** after copying. The `/skill-forge` command will appear in autocomplete.
 
 ### Step 4 — Verify
 
-Open any Claude Code session and type `/career-mode`. Claude should acknowledge the command and begin synthesizing the session. If it doesn't appear in autocomplete, check that the file is in the right directory and that you restarted.
+Open any Claude Code session and type `/skill-forge`. Claude should acknowledge the command and begin synthesizing the session. If it doesn't appear in autocomplete, check that the file is in the right directory and that you restarted.
 
 ## Usage
 
@@ -73,7 +73,7 @@ Open any Claude Code session and type `/career-mode`. Claude should acknowledge 
 At the end of a session, type:
 
 ```
-/career-mode
+/skill-forge
 ```
 
 Claude will:
@@ -86,9 +86,9 @@ Claude will:
 ### Specifying a mode
 
 ```
-/career-mode --mode portfolio-bullet
-/career-mode --mode technical-deep-dive
-/career-mode --mode all
+/skill-forge --mode portfolio-bullet
+/skill-forge --mode technical-deep-dive
+/skill-forge --mode all
 ```
 
 | Mode | Output |
@@ -119,7 +119,7 @@ Tradeoffs are the most valuable field for interview prep. Claude is instructed t
 
 ## Output format
 
-Artifacts are written to `~/.career-mode/artifacts/` (or `output_dir` from config). Each artifact is a `.md` file with YAML frontmatter:
+Artifacts are written to `~/.skill-forge/artifacts/` (or `output_dir` from config). Each artifact is a `.md` file with YAML frontmatter:
 
 ```yaml
 ---
@@ -148,13 +148,13 @@ Bullets follow XYZ: "Accomplished [X] by doing [Y], resulting in [Z]." Calibrate
 
 ## Troubleshooting
 
-**`/career-mode` doesn't appear in autocomplete**
-- Check the file exists at `~/.claude/commands/career-mode.md`
+**`/skill-forge` doesn't appear in autocomplete**
+- Check the file exists at `~/.claude/commands/skill-forge.md`
 - Restart Claude Code (the command registry is loaded at startup)
 
 **`model 'llama3.2' not found` error**
 - The CLI defaulted to Ollama because no API key was found
-- Set `ANTHROPIC_API_KEY` in your environment, or add `provider: anthropic` to `~/.career-mode/config.yaml`
+- Set `ANTHROPIC_API_KEY` in your environment, or add `provider: anthropic` to `~/.skill-forge/config.yaml`
 
 **Output is empty or malformed**
 - Check that `npx tsx` works in your terminal (`npx tsx --version`)
@@ -162,6 +162,6 @@ Bullets follow XYZ: "Accomplished [X] by doing [Y], resulting in [Z]." Calibrate
 
 ## The slash command file
 
-The file at `claude-code-integration/commands/career-mode.md` is what Claude Code loads as the `/career-mode` command. It contains instructions that Claude follows when the command is invoked — it's a prompt, not a script. You can customize it: change the default mode, add fields to extract, or adjust how tradeoffs are captured.
+The file at `claude-code-integration/commands/skill-forge.md` is what Claude Code loads as the `/skill-forge` command. It contains instructions that Claude follows when the command is invoked — it's a prompt, not a script. You can customize it: change the default mode, add fields to extract, or adjust how tradeoffs are captured.
 
 The file is versioned in the repo so updates to the command ship with the project.

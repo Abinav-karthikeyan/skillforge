@@ -19,7 +19,7 @@ async function main() {
   const transport = new StdioClientTransport({
     command: process.execPath,
     args: [join(PROJECT_ROOT, "dist/mcp/server.js")],
-    // Use project root so it picks up career-mode.config.yaml + .env
+    // Use project root so it picks up skill-forge.config.yaml + .env
     cwd: PROJECT_ROOT,
     env: { ...process.env } as Record<string, string>,
   });

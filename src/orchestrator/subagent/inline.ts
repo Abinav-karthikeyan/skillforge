@@ -15,7 +15,7 @@ import { runToolLoop } from "./tool-loop.js";
  * dependency, no separate context window beyond what the prompt carries.
  *
  * This runtime is the portability guarantee: every host that can run the
- * `career-mode` CLI can also run the focus scout, even without an agent SDK
+ * `skill-forge` CLI can also run the focus scout, even without an agent SDK
  * installed. Richer runtimes (Claude Agent SDK, OpenAI Agents) plug in as
  * additional SubagentRuntime implementations and never displace this one.
  *

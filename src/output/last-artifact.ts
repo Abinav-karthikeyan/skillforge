@@ -29,7 +29,7 @@ export function readLastArtifact(outputDir?: string): LastArtifact {
     indexRaw = readFileSync(indexPath, "utf-8");
   } catch {
     throw new Error(
-      `No artifacts index found at ${indexPath}. Run \`career-mode generate\` first.`
+      `No artifacts index found at ${indexPath}. Run \`skill-forge generate\` first.`
     );
   }
 

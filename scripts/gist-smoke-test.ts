@@ -68,7 +68,7 @@ async function runOffline() {
     if (!body.files[files[0]].content.includes("Test bullet from gist-smoke-test.ts")) {
       throw new Error("Gist body missing rendered content");
     }
-    if (!body.description.startsWith("Career Mode — portfolio-bullet")) {
+    if (!body.description.startsWith("skill-forge — portfolio-bullet")) {
       throw new Error(`Bad description: ${body.description}`);
     }
     console.log("✓ request shape correct");

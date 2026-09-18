@@ -11,7 +11,7 @@
     "dist/",
     "README.md",
     "LICENSE",
-    "career-mode.config.yaml"
+    "skill-forge.config.yaml"
   ],
   "scripts": {
     "build": "rimraf dist && tsc && node -e \"require('fs').cpSync('src/prompts','dist/prompts',{recursive:true})\"",

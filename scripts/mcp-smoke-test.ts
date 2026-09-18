@@ -2,7 +2,7 @@
 /**
  * MCP smoke test — spawns the built MCP server (dist/mcp/server.js) over stdio using
  * the MCP client SDK (not the CLI directly) and drives it through: initialize,
- * tools/list, list_career_artifacts, and generate_career_artifact against the
+ * tools/list, list_skill_forge_artifacts, and generate_skill_forge_artifact against the
  * sample fixture.
  *
  * This exercises the actual MCP protocol path, not just the underlying pipeline —
@@ -43,7 +43,7 @@ const model = flag("--model");
 const baseUrl = flag("--base-url");
 
 // Isolated cwd so this run's config doesn't depend on (or pollute) the repo root's config.
-const smokeCwd = mkdtempSync(join(tmpdir(), "career-mode-mcp-smoke-"));
+const smokeCwd = mkdtempSync(join(tmpdir(), "skill-forge-mcp-smoke-"));
 const outputDir = join(smokeCwd, "artifacts");
 
 if (provider) {
@@ -54,7 +54,7 @@ if (provider) {
     model ? `model: ${model}` : "",
     baseUrl ? `base_url: ${baseUrl}` : "",
   ].filter(Boolean);
-  writeFileSync(join(smokeCwd, "career-mode.config.yaml"), configLines.join("\n") + "\n", "utf-8");
+  writeFileSync(join(smokeCwd, "skill-forge.config.yaml"), configLines.join("\n") + "\n", "utf-8");
 }
 
 async function main() {
@@ -68,7 +68,7 @@ async function main() {
     env: { ...process.env } as Record<string, string>,
   });
 
-  const client = new Client({ name: "career-mode-smoke-test", version: "0.0.1" });
+  const client = new Client({ name: "skill-forge-smoke-test", version: "0.0.1" });
 
   // Cold start in this dev environment (OneDrive-synced node_modules) can take well over
   // the SDK's default 60s request timeout just to resolve imports — give it real headroom.
@@ -81,8 +81,8 @@ async function main() {
   const tools = await client.listTools(undefined, { timeout: COLD_START_TIMEOUT_MS });
   const gotNames = tools.tools.map((t) => t.name).sort();
   const expectedNames = [
-    "generate_career_artifact",
-    "list_career_artifacts",
+    "generate_skill_forge_artifact",
+    "list_skill_forge_artifacts",
     "share_last_artifact",
     "notion_auth_status",
   ].sort();
@@ -91,15 +91,15 @@ async function main() {
     throw new Error(`Tool list mismatch. Expected ${expectedNames}, got ${gotNames}`);
   }
 
-  console.log("\n→ list_career_artifacts (no LLM call)...");
+  console.log("\n→ list_skill_forge_artifacts (no LLM call)...");
   const listResult = await client.callTool(
-    { name: "list_career_artifacts", arguments: { output_dir: outputDir } },
+    { name: "list_skill_forge_artifacts", arguments: { output_dir: outputDir } },
     undefined,
     { timeout: COLD_START_TIMEOUT_MS }
   );
   console.log("✓ responded:", JSON.stringify(listResult.content).slice(0, 150));
 
-  console.log("\n→ generate_career_artifact against tests/fixtures/sample-session.json (real LLM call)...");
+  console.log("\n→ generate_skill_forge_artifact against tests/fixtures/sample-session.json (real LLM call)...");
   const fixture = JSON.parse(
     readFileSync(join(PROJECT_ROOT, "tests/fixtures/sample-session.json"), "utf-8")
   );
@@ -108,7 +108,7 @@ async function main() {
   const GENERATE_TIMEOUT_MS = 300_000;
   const genResult = await client.callTool(
     {
-      name: "generate_career_artifact",
+      name: "generate_skill_forge_artifact",
       arguments: { mode: "portfolio-bullet", session_summary: fixture, output_dir: outputDir },
     },
     undefined,
@@ -118,9 +118,9 @@ async function main() {
   const isError = (genResult as { isError?: boolean }).isError;
   const text = JSON.stringify(genResult.content);
   if (isError) {
-    throw new Error(`generate_career_artifact returned isError: ${text.slice(0, 500)}`);
+    throw new Error(`generate_skill_forge_artifact returned isError: ${text.slice(0, 500)}`);
   }
-  console.log("✓ generate_career_artifact succeeded:");
+  console.log("✓ generate_skill_forge_artifact succeeded:");
   console.log(text.slice(0, 400));
 
   await client.close();

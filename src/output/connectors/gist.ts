@@ -29,7 +29,7 @@ export class GistConnector implements CareerModeConnector {
     if (!token) {
       throw new Error(
         "GistConnector requires a GitHub token. Set GITHUB_TOKEN in the environment " +
-          "or set `gist_token` in career-mode.config.yaml. The token needs the `gist` scope only."
+          "or set `gist_token` in skill-forge.config.yaml. The token needs the `gist` scope only."
       );
     }
     this.token = token;
@@ -39,7 +39,7 @@ export class GistConnector implements CareerModeConnector {
   async write(output: TranslatorOutput, session: SessionSummary): Promise<string> {
     const filename = buildFilename(output, session);
     const markdown = renderMarkdown(output, session);
-    const description = `Career Mode — ${output.mode} — ${session.summary.one_liner}`;
+    const description = `skill-forge — ${output.mode} — ${session.summary.one_liner}`;
     return this.createGist(filename, markdown, description);
   }
 
@@ -52,7 +52,7 @@ export class GistConnector implements CareerModeConnector {
         Accept: "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
         "Content-Type": "application/json",
-        "User-Agent": "career-mode",
+        "User-Agent": "skill-forge",
       },
       body: JSON.stringify({
         description,

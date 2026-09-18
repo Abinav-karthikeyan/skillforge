@@ -1,25 +1,25 @@
-# Career Mode
+# skill-forge
 
 [![npm version](https://img.shields.io/npm/v/@abhinavravich1999/skill-forge)](https://www.npmjs.com/package/@abhinavravich1999/skill-forge)
 [![CI](https://github.com/Abinav-karthikeyan/skillforge/actions/workflows/ci.yml/badge.svg)](https://github.com/Abinav-karthikeyan/skillforge/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-> Your sessions already contain your best career stories. Career Mode extracts them before you forget.
+> Your sessions already contain your best career stories. skill-forge extracts them before you forget.
 
 You just spent four hours debugging a race condition, or designed a provider abstraction that handles five LLM backends, or ripped out legacy auth middleware because legal flagged a compliance gap. In a week you'll remember "fixed some bug." In six months, nothing. Interviews and resumes are reconstructed from faded memory, months after the specifics vanished.
 
-**Career Mode captures session context at peak richness** — right now, while the conversation is still open — and translates it into artifacts you can actually use: STAR-format interview answers, XYZ resume bullets, and technical narratives ready for a portfolio or blog post.
+**skill-forge captures session context at peak richness** — right now, while the conversation is still open — and translates it into artifacts you can actually use: STAR-format interview answers, XYZ resume bullets, and technical narratives ready for a portfolio or blog post.
 
 ---
 
 ## "Couldn't you just write a skill for this?"
 
-Yes — and that's exactly what Career Mode is *not*.
+Yes — and that's exactly what skill-forge is *not*.
 
-Career Mode is a different category of thing:
+skill-forge is a different category of thing:
 
 
-The slash command (`/career-mode`) is the lowest-friction entry point. It is not the whole product.
+The slash command (`/skill-forge`) is the lowest-friction entry point. It is not the whole product.
 
 ---
 
@@ -29,12 +29,12 @@ A single pipeline — `ingestor → translators → output` — exposed four way
 
 | Surface | When you'd use it | Context source |
 |---|---|---|
-| **`/career-mode`** slash command | End of a Claude Code session | Full conversation transcript — richest signal |
-| **MCP server** (`career-mode-mcp`) | Any MCP-capable host: Claude Desktop, custom tooling | Tool call args (`session_summary`), or git fallback |
-| **CLI** (`career-mode generate`) | Scripts, CI, or piping a git diff | `--json` file, or local git log/diff |
+| **`/skill-forge`** slash command | End of a Claude Code session | Full conversation transcript — richest signal |
+| **MCP server** (`skill-forge-mcp`) | Any MCP-capable host: Claude Desktop, custom tooling | Tool call args (`session_summary`), or git fallback |
+| **CLI** (`skill-forge generate`) | Scripts, CI, or piping a git diff | `--json` file, or local git log/diff |
 | **git commit hook** | Every commit, zero extra steps | git log + diff — no session required |
 
-All four surfaces feed the same pipeline. The `/career-mode` slash command produces the richest output because it has the full conversation; the git hook produces the leanest because it works purely from diff context. Same typed contract at the output end either way.
+All four surfaces feed the same pipeline. The `/skill-forge` slash command produces the richest output because it has the full conversation; the git hook produces the leanest because it works purely from diff context. Same typed contract at the output end either way.
 
 ---
 
@@ -81,14 +81,14 @@ npx @abhinavravich1999/skill-forge generate --help
 
 ### 2. Configure your LLM provider
 
-Career Mode has its own LLM client, independent of whatever powers your Claude Code session. The recommended path is `openai-compatible` — it works with DeepSeek, Groq, Together, Fireworks, xAI, LM Studio, vLLM, Ollama, and OpenAI itself.
+skill-forge has its own LLM client, independent of whatever powers your Claude Code session. The recommended path is `openai-compatible` — it works with DeepSeek, Groq, Together, Fireworks, xAI, LM Studio, vLLM, Ollama, and OpenAI itself.
 
 ```bash
-cp career-mode.config.yaml ~/.career-mode/config.yaml
+cp skill-forge.config.yaml ~/.skill-forge/config.yaml
 cp .env.example .env
 ```
 
-Edit `~/.career-mode/config.yaml`. DeepSeek is fast and cheap — a good default:
+Edit `~/.skill-forge/config.yaml`. DeepSeek is fast and cheap — a good default:
 
 ```yaml
 provider: openai-compatible
@@ -103,7 +103,7 @@ Add the key to `.env`:
 DEEPSEEK_API_KEY=sk-...
 ```
 
-`.env` is loaded from project root first, then `~/.career-mode/.env`. Shell env always wins.
+`.env` is loaded from project root first, then `~/.skill-forge/.env`. Shell env always wins.
 
 **Skip the config file entirely** and the provider auto-detects from env:
 
@@ -117,17 +117,17 @@ DEEPSEEK_API_KEY=sk-...
 
 ```bash
 # macOS / Linux
-cp claude-code-integration/commands/career-mode.md ~/.claude/commands/career-mode.md
+cp claude-code-integration/commands/skill-forge.md ~/.claude/commands/skill-forge.md
 
 # Windows (PowerShell)
-Copy-Item claude-code-integration\commands\career-mode.md "$env:USERPROFILE\.claude\commands\career-mode.md"
+Copy-Item claude-code-integration\commands\skill-forge.md "$env:USERPROFILE\.claude\commands\skill-forge.md"
 ```
 
-Restart Claude Code. `/career-mode` is now available in any session.
+Restart Claude Code. `/skill-forge` is now available in any session.
 
 ### 4. (Optional) Register the MCP server
 
-Register Career Mode as an MCP server so any MCP-capable client can call it as a tool — including Claude Code, Claude Desktop, or your own tooling:
+Register skill-forge as an MCP server so any MCP-capable client can call it as a tool — including Claude Code, Claude Desktop, or your own tooling:
 
 ```bash
 claude mcp add skill-forge -- npx --package=@abhinavravich1999/skill-forge skill-forge-mcp
@@ -137,7 +137,7 @@ Or add it to `.mcp.json` directly — see [claude-code-integration/mcp/.mcp.json
 
 ### 5. (Optional) Install the git commit hook
 
-Fire Career Mode on every commit — no session required, no extra steps:
+Fire skill-forge on every commit — no session required, no extra steps:
 
 ```json
 {
@@ -157,12 +157,12 @@ Add this to `~/.claude/settings.json` under `hooks`.
 
 ### 6. (Optional) Connect to Notion
 
-Push artifacts directly into a Notion database — turn Career Mode into a living brag doc.
+Push artifacts directly into a Notion database — turn skill-forge into a living brag doc.
 
 **One command does everything** — token validation, database creation, config write:
 
 ```bash
-career-mode auth notion
+skill-forge auth notion
 ```
 
 The guided flow:
@@ -171,14 +171,14 @@ The guided flow:
 2. Shares a page with the integration in the Notion UI
 3. Pastes the integration token when prompted (input is hidden — never logged)
 4. Picks the parent page from a list (or pastes a URL/ID)
-5. Done — the database is created, credentials written to `~/.career-mode/.env`, config updated
+5. Done — the database is created, credentials written to `~/.skill-forge/.env`, config updated
 
 Artifacts now land in Notion with full metadata (Mode, Technologies, Patterns) as database properties.
 
 **Check status at any time:**
 
 ```bash
-career-mode auth status
+skill-forge auth status
 ```
 
 **From an MCP host** (Claude Code, Claude Desktop, etc.) — call `notion_auth_status` to see whether Notion is configured without leaving your session.
@@ -187,10 +187,10 @@ career-mode auth status
 <summary>Manual / non-interactive setup</summary>
 
 ```bash
-# 1. Add NOTION_TOKEN=ntn_... to ~/.career-mode/.env
+# 1. Add NOTION_TOKEN=ntn_... to ~/.skill-forge/.env
 # 2. Create the database:
 npx tsx scripts/notion-setup.ts <parent-page-id>
-# 3. Add to ~/.career-mode/config.yaml:
+# 3. Add to ~/.skill-forge/config.yaml:
 #   connector: notion
 #   notion_token: ${NOTION_TOKEN}
 #   notion_database_id: <printed-id>
@@ -203,12 +203,12 @@ npx tsx scripts/notion-setup.ts <parent-page-id>
 Push artifacts into a **Gemini Notebook** (formerly NotebookLM) so you can chat over your own
 career corpus with grounded, cited answers.
 
-There is a deliberate design choice here: Career Mode does **not** ship a Gemini Notebook
+There is a deliberate design choice here: skill-forge does **not** ship a Gemini Notebook
 connector that holds your Google credentials. Google exposes no official consumer write API,
-so a bespoke connector would mean Career Mode driving a headless Chrome with your cookies —
-fragile and a credential liability. Instead, Career Mode uses **host-delivery**: it renders the
+so a bespoke connector would mean skill-forge driving a headless Chrome with your cookies —
+fragile and a credential liability. Instead, skill-forge uses **host-delivery**: it renders the
 artifact and hands it back, and a NotebookLM MCP that *you* have authorized does the delivery.
-Career Mode holds zero Google credentials.
+skill-forge holds zero Google credentials.
 
 **One-time setup** — install a NotebookLM MCP CLI (any that exposes an `add_source` / `source add`
 tool with a text/paste type works; [`notebooklm-mcp-cli`](https://github.com/jacob-bd/notebooklm-mcp-cli)
@@ -225,16 +225,16 @@ markdown to the notebook as a text source:
 
 ```bash
 # 1. Render + return (also saved to your local corpus)
-career-mode generate --mode technical-deep-dive --connector return_only --json session.json
+skill-forge generate --mode technical-deep-dive --connector return_only --json session.json
 
 # 2. Add the saved artifact to the notebook as a text source
-nlm source add <notebook-id> --text "$(cat ~/.career-mode/artifacts/<file>.md)" \
+nlm source add <notebook-id> --text "$(cat ~/.skill-forge/artifacts/<file>.md)" \
   --title "Career artifact" --wait
 ```
 
-Inside an MCP host (Claude Code, Claude Desktop) that has *both* Career Mode and a NotebookLM
+Inside an MCP host (Claude Code, Claude Desktop) that has *both* skill-forge and a NotebookLM
 MCP connected, this is one sentence: *"generate a technical deep-dive and add it to my Gemini
-Notebook."* The host calls `generate_career_artifact` with `connector: "return_only"`, gets the
+Notebook."* The host calls `generate_skill_forge_artifact` with `connector: "return_only"`, gets the
 markdown back, and calls the NotebookLM MCP's `add_source(type=text)` with it — no glue code.
 
 > **Verified round-trip:** `generate --connector return_only` → `nlm source add --text` ingests
@@ -252,18 +252,18 @@ wherever the host already holds the credential.
 At the end of a Claude Code session:
 
 ```
-/career-mode
+/skill-forge
 ```
 
-Claude synthesizes the session into a structured summary, runs it through the pipeline, and writes an artifact to `~/.career-mode/artifacts/`. The output path is printed in the terminal.
+Claude synthesizes the session into a structured summary, runs it through the pipeline, and writes an artifact to `~/.skill-forge/artifacts/`. The output path is printed in the terminal.
 
 Specify the mode:
 
 ```
-/career-mode --mode interview-qa
-/career-mode --mode portfolio-bullet
-/career-mode --mode technical-deep-dive
-/career-mode --mode all
+/skill-forge --mode interview-qa
+/skill-forge --mode portfolio-bullet
+/skill-forge --mode technical-deep-dive
+/skill-forge --mode all
 ```
 
 Default is `interview-qa`. See [docs/slash-command.md](docs/slash-command.md) for a full walkthrough.
@@ -288,9 +288,9 @@ All three modes, separate files.
 
 ## Custom instructions
 
-Career Mode injects your custom instructions into every translator system prompt — giving the LLM context it cannot infer from git alone.
+skill-forge injects your custom instructions into every translator system prompt — giving the LLM context it cannot infer from git alone.
 
-Add `custom_instructions` to `~/.career-mode/config.yaml`:
+Add `custom_instructions` to `~/.skill-forge/config.yaml`:
 
 ```yaml
 # Simple: one string applies to all modes
@@ -341,12 +341,12 @@ To add a new prompt version: create `src/prompts/<mode>/v2.txt`, add it to `src/
 
 ## Configuration
 
-`~/.career-mode/config.yaml` (global) or `<project-root>/career-mode.config.yaml` (project override — takes precedence):
+`~/.skill-forge/config.yaml` (global) or `<project-root>/skill-forge.config.yaml` (project override — takes precedence):
 
 ```yaml
 experience_level: senior       # junior | mid | senior | staff
 tone: balanced                 # technical | business | balanced
-output_dir: ~/.career-mode/artifacts
+output_dir: ~/.skill-forge/artifacts
 
 # Provider — auto-detected from env if omitted
 # provider: anthropic
@@ -370,19 +370,19 @@ output_dir: ~/.career-mode/artifacts
 # default_mode: portfolio-bullet
 
 # Output connector
-# connector: local              # default — writes ~/.career-mode/artifacts/
+# connector: local              # default — writes ~/.skill-forge/artifacts/
 # connector: gist               # also pushes each artifact to a GitHub Gist
 # gist_token: ghp_...           # or set GITHUB_TOKEN (needs `gist` scope)
 # gist_public: false            # default: secret gist
 # connector: notion             # also creates a Notion page with metadata
-# notion_token: ${NOTION_TOKEN}         # run `career-mode auth notion` to set up
+# notion_token: ${NOTION_TOKEN}         # run `skill-forge auth notion` to set up
 # notion_database_id: ${NOTION_DATABASE_ID}
 # connector: return_only        # writes locally AND returns the rendered artifact so the
 #                               # host delivers it (Gemini Notebook, Slack, LinkedIn, Docs).
 #                               # Holds zero third-party credentials — see the README.
 
 # Custom instructions — injected into every translator system prompt.
-# Give Career Mode context it can't infer from git: interview targets, tone, what to emphasize.
+# Give skill-forge context it can't infer from git: interview targets, tone, what to emphasize.
 #
 # Flat string (applies to all modes):
 # custom_instructions: >
@@ -404,26 +404,26 @@ output_dir: ~/.career-mode/artifacts
 
 ```bash
 # Generate from a session JSON (slash command path)
-career-mode generate --mode interview-qa --json ~/.career-mode-session.json
+skill-forge generate --mode interview-qa --json ~/.skill-forge-session.json
 
 # Generate from git context (hook path — no --json)
-career-mode generate --mode portfolio-bullet
+skill-forge generate --mode portfolio-bullet
 
 # List all generated artifacts
-career-mode list
+skill-forge list
 
 # Push the most recent artifact to a GitHub Gist
-career-mode share
+skill-forge share
 
 # Host-delivery: render + return the artifact for the host to deliver (Gemini Notebook, Slack, …)
-career-mode generate --mode technical-deep-dive --connector return_only --json session.json
+skill-forge generate --mode technical-deep-dive --connector return_only --json session.json
 
 # Override output directory
-career-mode generate --mode all --output-dir ./my-artifacts
+skill-forge generate --mode all --output-dir ./my-artifacts
 
 # Auth subcommands
-career-mode auth notion          # guided Notion setup (interactive)
-career-mode auth status          # show which connectors are authenticated
+skill-forge auth notion          # guided Notion setup (interactive)
+skill-forge auth status          # show which connectors are authenticated
 ```
 
 ---
@@ -446,7 +446,7 @@ src/
   index.ts        # CLI entry point — generate, list, share, auth subcommands
 
 claude-code-integration/
-  commands/       # career-mode.md — install as a Claude Code slash command
+  commands/       # skill-forge.md — install as a Claude Code slash command
   hooks/          # post-session.json — reference hook config
   mcp/            # .mcp.json — reference MCP server registration
 
@@ -484,9 +484,9 @@ v0.1 — working, weekend-built. Tested on:
 
 - Automated test suite: 74 Vitest tests across 11 files (ingestor, renderer, prompt loader/version resolution, local/gist/notion connectors, return_only host-delivery, orchestrator/scout, MCP server integration) + GitHub Actions CI on Node 20/22, Ubuntu/Windows
 - Anthropic API (Claude Sonnet), Ollama (local, no key), DeepSeek via `openai-compatible`
-- `/career-mode` slash command path end-to-end
+- `/skill-forge` slash command path end-to-end
 - CLI (`generate`, `list`, `share`, `auth notion`, `auth status`) against real APIs
-- MCP server: `scripts/mcp-smoke-test.ts` drives `initialize → tools/list → list_career_artifacts → generate_career_artifact` over MCP client SDK; `claude mcp add` + `claude mcp get` confirms Claude Code's own MCP client connects (`✔ Connected`)
+- MCP server: `scripts/mcp-smoke-test.ts` drives `initialize → tools/list → list_skill_forge_artifacts → generate_skill_forge_artifact` over MCP client SDK; `claude mcp add` + `claude mcp get` confirms Claude Code's own MCP client connects (`✔ Connected`)
 - `.env` loading with `${VAR}` config indirection, verified by `scripts/deepseek-smoke-test.ts`
 - Gist connector — offline (mocked fetch) and live via the MCP `share_last_artifact` tool
 - Notion connector — live end-to-end: `generate --connector notion` (both `interview-qa` and `portfolio-bullet`), `share_last_artifact --destination notion` via MCP; properties (Title, Mode, Technologies, Date, Patterns) all populated
@@ -495,6 +495,6 @@ v0.1 — working, weekend-built. Tested on:
 Not yet tested end-to-end:
 - OpenAI direct provider (`provider: openai` — the `openai-compatible` path with `base_url: https://api.openai.com/v1` is equivalent and works)
 - git commit hook path
-- `npm link` / `npx career-mode-mcp` as installed global binaries
+- `npm link` / `npx skill-forge-mcp` as installed global binaries
 
 Contributions and issues welcome.

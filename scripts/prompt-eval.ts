@@ -94,7 +94,7 @@ async function main() {
   const evalDir = join(process.cwd(), "test-output", "eval", timestamp);
   mkdirSync(evalDir, { recursive: true });
 
-  console.log(`\n🧪 Career Mode prompt eval — ${timestamp}`);
+  console.log(`\n🧪 skill-forge prompt eval — ${timestamp}`);
   console.log(`   Fixtures : ${fixtures.join(", ")}`);
   console.log(`   Modes    : ${modes.join(", ")}`);
   console.log(`   Output   : ${evalDir}\n`);

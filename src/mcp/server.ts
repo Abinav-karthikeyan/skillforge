@@ -53,48 +53,47 @@ async function runTranslator(
   return translateTechnicalDeepDive(client, session, config, promptVersion);
 }
 
-server.registerTool(
-  "generate_career_artifact",
-  {
-    title: "Generate career artifact",
-    description:
-      "Translate a coding session into an interview-ready artifact (STAR-format Q&A, resume bullets, or a technical deep-dive) " +
-      "and write it to the configured output directory. Pass `session_summary` with the structured session context " +
-      "(problem, approach, tradeoffs, dead ends, tech stack) synthesized from the current conversation for the richest result. " +
-      "If omitted, falls back to summarizing the local git log/diff.",
-    inputSchema: {
-      mode: MODE_ENUM.default("portfolio-bullet").describe(
-        "Which artifact(s) to generate. 'all' generates all three modes."
+const generateToolConfig = {
+  title: "Generate skill-forge artifact",
+  description:
+    "Translate a coding session into an interview-ready artifact (STAR-format Q&A, resume bullets, or a technical deep-dive) " +
+    "and write it to the configured output directory. Pass `session_summary` with the structured session context " +
+    "(problem, approach, tradeoffs, dead ends, tech stack) synthesized from the current conversation for the richest result. " +
+    "If omitted, falls back to summarizing the local git log/diff.",
+  inputSchema: {
+    mode: MODE_ENUM.default("portfolio-bullet").describe(
+      "Which artifact(s) to generate. 'all' generates all three modes."
+    ),
+    session_summary: SessionSummarySchema.partial({ session_id: true, timestamp: true, source_tool: true })
+      .optional()
+      .describe(
+        "Structured session context. Synthesize this from the conversation: one_liner, problem_statement, approach, " +
+          "tradeoffs, dead_ends, technologies, patterns_used, complexity_signals. Omit to fall back to git log/diff."
       ),
-      session_summary: SessionSummarySchema.partial({ session_id: true, timestamp: true, source_tool: true })
-        .optional()
-        .describe(
-          "Structured session context. Synthesize this from the conversation: one_liner, problem_statement, approach, " +
-            "tradeoffs, dead_ends, technologies, patterns_used, complexity_signals. Omit to fall back to git log/diff."
-        ),
-      output_dir: z.string().optional().describe("Override the configured output directory."),
-      connector: z
-        .string()
-        .optional()
-        .describe(`Output connector (${listConnectors().join(", ")}). Defaults to 'local'.`),
-      prompt_version: z
-        .string()
-        .optional()
-        .describe("Prompt version to use (e.g. 'v2'). Falls back to CAREER_MODE_PROMPT_VERSION env var, then manifest active version."),
-      focus: z
-        .union([z.string(), z.array(z.string())])
-        .optional()
-        .describe(
-          "Interview-qa only: focus lens (e.g. 'system-design tradeoffs', 'cross-team influence'). " +
-            "Triggers the focus-scout subagent under the configured focus_effort budget."
-        ),
-      focus_effort: z
-        .enum(["low", "medium", "off"])
-        .optional()
-        .describe("Focus subagent budget tier. Defaults to config.focus_effort or 'low'."),
-    },
+    output_dir: z.string().optional().describe("Override the configured output directory."),
+    connector: z
+      .string()
+      .optional()
+      .describe(`Output connector (${listConnectors().join(", ")}). Defaults to 'local'.`),
+    prompt_version: z
+      .string()
+      .optional()
+      .describe("Prompt version to use (e.g. 'v2'). Falls back to SKILL_FORGE_PROMPT_VERSION env var, then manifest active version."),
+    focus: z
+      .union([z.string(), z.array(z.string())])
+      .optional()
+      .describe(
+        "Interview-qa only: focus lens (e.g. 'system-design tradeoffs', 'cross-team influence'). " +
+          "Triggers the focus-scout subagent under the configured focus_effort budget."
+      ),
+    focus_effort: z
+      .enum(["low", "medium", "off"])
+      .optional()
+      .describe("Focus subagent budget tier. Defaults to config.focus_effort or 'low'."),
   },
-  async ({ mode, session_summary, output_dir, connector, prompt_version, focus, focus_effort }) => {
+} as const;
+
+const generateHandler = async ({ mode, session_summary, output_dir, connector, prompt_version, focus, focus_effort }: any): Promise<{ content: Array<{ type: "text"; text: string }>; isError?: boolean }> => {
     try {
       const config = loadCalibration();
       if (output_dir) config.output_dir = output_dir;
@@ -142,19 +141,27 @@ server.registerTool(
         isError: true,
       };
     }
-  }
+};
+
+// Primary (current) tool name.
+server.registerTool("generate_skill_forge_artifact", generateToolConfig, generateHandler);
+// Deprecated alias — kept for one release so existing MCP hosts keep working.
+// Remove after the naming migration window (see src/config/paths.ts).
+server.registerTool(
+  "generate_career_artifact",
+  { ...generateToolConfig, description: `[DEPRECATED: use generate_skill_forge_artifact] ${generateToolConfig.description}` },
+  generateHandler
 );
 
-server.registerTool(
-  "list_career_artifacts",
-  {
-    title: "List career artifacts",
-    description: "List previously generated career artifacts from the output directory's index.",
-    inputSchema: {
-      output_dir: z.string().optional().describe("Override the configured output directory."),
-    },
+const listToolConfig = {
+  title: "List skill-forge artifacts",
+  description: "List previously generated artifacts from the output directory's index.",
+  inputSchema: {
+    output_dir: z.string().optional().describe("Override the configured output directory."),
   },
-  async ({ output_dir }) => {
+} as const;
+
+const listHandler = async ({ output_dir }: any): Promise<{ content: Array<{ type: "text"; text: string }>; isError?: boolean }> => {
     try {
       const config = loadCalibration();
       const resolved = resolveArtifactsDir(output_dir ?? config.output_dir);
@@ -166,7 +173,7 @@ server.registerTool(
       } catch {
         return {
           content: [
-            { type: "text", text: `No artifacts found at ${resolved}. Run generate_career_artifact first.` },
+            { type: "text", text: `No artifacts found at ${resolved}. Run generate_skill_forge_artifact first.` },
           ],
         };
       }
@@ -176,7 +183,14 @@ server.registerTool(
         isError: true,
       };
     }
-  }
+};
+
+server.registerTool("list_skill_forge_artifacts", listToolConfig, listHandler);
+// Deprecated alias — remove after the naming migration window.
+server.registerTool(
+  "list_career_artifacts",
+  { ...listToolConfig, description: `[DEPRECATED: use list_skill_forge_artifacts] ${listToolConfig.description}` },
+  listHandler
 );
 
 server.registerTool(
@@ -228,7 +242,7 @@ server.registerTool(
         url = await gist.createGist(
           last.filename,
           last.markdown,
-          `Career Mode — ${last.entry.mode} — ${last.entry.one_liner}`
+          `skill-forge — ${last.entry.mode} — ${last.entry.one_liner}`
         );
       }
 
@@ -254,7 +268,7 @@ server.registerTool(
   {
     title: "Notion auth status",
     description:
-      "Check whether Notion is configured for Career Mode. Returns the current status " +
+      "Check whether Notion is configured for skill-forge. Returns the current status " +
       "and the CLI command to run if setup is needed. Does not expose secrets.",
     inputSchema: {},
   },
@@ -296,7 +310,7 @@ server.registerTool(
             `✗ Notion is not configured (missing: ${missing}).`,
             "",
             "Run this in a terminal to complete setup:",
-            "  career-mode auth notion",
+            "  skill-forge auth notion",
             "",
             "Or follow the manual steps in the README under 'Connect to Notion'.",
           ].join("\n"),
@@ -312,6 +326,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error("Career Mode MCP server failed to start:", err);
+  console.error("skill-forge MCP server failed to start:", err);
   process.exit(1);
 });

@@ -127,7 +127,7 @@ export async function runFocusScout(
   // Grant repo tools only when the tier actually spends tool calls. The v2
   // focus-brief prompt teaches the model the JSON tool-call protocol, so we
   // pick v2 whenever tools are in play and v1 for the single-shot path.
-  // Explicit CAREER_MODE_PROMPT_VERSION overrides both.
+  // Explicit SKILL_FORGE_PROMPT_VERSION (or legacy CAREER_MODE_PROMPT_VERSION) overrides both.
   const wantsTools = budget.max_tool_calls > 0;
   const tools: ToolDef[] = wantsTools ? buildScoutTools() : [];
   const promptVersion = promptVersionFromEnv()

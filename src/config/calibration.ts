@@ -16,7 +16,7 @@ function resolveEnvRef(value: string, fieldName: string): string {
   if (resolved === undefined || resolved === "") {
     throw new Error(
       `${fieldName} references env var $${envName} but it is not set. ` +
-        `Add ${envName}=... to your .env (project root or ~/.career-mode/.env) or export it in your shell.`
+        `Add ${envName}=... to your .env (project root or ~/.skill-forge/.env) or export it in your shell.`
     );
   }
   return resolved;

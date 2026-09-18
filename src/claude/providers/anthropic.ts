@@ -10,7 +10,7 @@ export class AnthropicProvider implements LLMClient {
     const key = apiKey ?? process.env.ANTHROPIC_API_KEY;
     if (!key) {
       throw new Error(
-        "ANTHROPIC_API_KEY is not set.\nExport it before running career-mode:\n  export ANTHROPIC_API_KEY=sk-ant-..."
+        "ANTHROPIC_API_KEY is not set.\nExport it before running skill-forge:\n  export ANTHROPIC_API_KEY=sk-ant-..."
       );
     }
     this.client = new Anthropic({ apiKey: key });

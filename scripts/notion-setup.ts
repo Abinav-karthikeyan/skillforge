@@ -1,12 +1,12 @@
 #!/usr/bin/env npx tsx
 /**
- * Creates a Career Mode database in Notion with the correct schema.
+ * Creates a skill-forge database in Notion with the correct schema.
  *
  * Usage:
  *   npx tsx scripts/notion-setup.ts [parent-page-id]
  *
  * NOTION_TOKEN and optionally NOTION_PAGE_ID are read from .env
- * (project root or ~/.career-mode/.env).
+ * (project root or ~/.skill-forge/.env).
  * The parent page must be shared with your Notion integration.
  * Go to https://www.notion.so/profile/integrations to create one.
  */
@@ -16,7 +16,7 @@ import "../src/config/preload-env.js";
 const token = process.env.NOTION_TOKEN;
 if (!token) {
   console.error("Error: NOTION_TOKEN is not set.");
-  console.error("Add NOTION_TOKEN=ntn_... to your .env file (project root or ~/.career-mode/.env).");
+  console.error("Add NOTION_TOKEN=ntn_... to your .env file (project root or ~/.skill-forge/.env).");
   console.error("Create an integration at https://www.notion.so/profile/integrations");
   process.exit(1);
 }
@@ -39,7 +39,7 @@ if (!parentPageId) {
 }
 
 async function main() {
-  console.log("Creating Career Mode database...");
+  console.log("Creating skill-forge database...");
   console.log(`  Parent page: ${parentPageId}`);
 
   try {
@@ -55,7 +55,7 @@ async function main() {
       },
       body: JSON.stringify({
         parent: { type: "page_id", page_id: parentPageId },
-        title: [{ type: "text", text: { content: "Career Mode Artifacts" } }],
+        title: [{ type: "text", text: { content: "skill-forge Artifacts" } }],
         properties: {
           Title: { title: {} },
           Mode: {
@@ -83,7 +83,7 @@ async function main() {
     console.log("");
     console.log("Database created successfully!");
     console.log("");
-    console.log("Add this to your career-mode.config.yaml:");
+    console.log("Add this to your skill-forge.config.yaml:");
     console.log("");
     console.log("  connector: notion");
     console.log(`  notion_token: \${NOTION_TOKEN}`);

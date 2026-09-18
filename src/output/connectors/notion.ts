@@ -21,13 +21,13 @@ export class NotionConnector implements CareerModeConnector {
     if (!token) {
       throw new Error(
         "NotionConnector requires a Notion integration token. Set NOTION_TOKEN in the environment " +
-          "or set `notion_token` in career-mode.config.yaml. " +
+          "or set `notion_token` in skill-forge.config.yaml. " +
           "Create an integration at https://www.notion.so/profile/integrations"
       );
     }
     if (!opts.databaseId) {
       throw new Error(
-        "NotionConnector requires a database ID. Set `notion_database_id` in career-mode.config.yaml. " +
+        "NotionConnector requires a database ID. Set `notion_database_id` in skill-forge.config.yaml. " +
           "Run `npx tsx scripts/notion-setup.ts` to create the database automatically."
       );
     }

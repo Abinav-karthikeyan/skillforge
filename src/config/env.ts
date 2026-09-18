@@ -10,7 +10,8 @@ import { envPath } from "./paths.js";
  * Lookup order (first hit wins for a given key; existing process.env always wins):
  *   1. Shell environment (already set — never overridden)
  *   2. <cwd>/.env               — project-local secrets
- *   3. ~/.career-mode/.env      — user-global fallback for globally-installed CLI
+ *   3. ~/.skill-forge/.env      — user-global fallback for globally-installed CLI
+ *                                 (legacy ~/.career-mode/.env still read via configDir())
  *
  * `override: false` on every load so shell env beats file env, and the earlier
  * file wins over the later file. This matches the convention every other CLI uses.
