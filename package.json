@@ -1,6 +1,6 @@
 {
   "name": "@abhinavravich1999/skill-forge",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Turn your coding sessions into interview-ready stories, portfolio bullets, and technical deep-dive Q&A",
   "main": "dist/index.js",
   "bin": {
@@ -10,6 +10,7 @@
   "files": [
     "dist/",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE",
     "skill-forge.config.yaml"
   ],
