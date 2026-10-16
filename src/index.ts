@@ -29,12 +29,16 @@ import {
   observeSettingsPath,
   saveObserveSettings,
 } from "./observer/settings.js";
-import { claudeSettingsPath, installObserverHooks, uninstallObserverHooks } from "./observer/install.js";
 import { runObserverPass } from "./observer/worker.js";
 import { reflectPending, reflectSession } from "./observer/reflector.js";
 import { approveStory, describeCandidate, discardStory, listCandidates } from "./observer/inbox.js";
 import { backfillTranscripts, parseDuration } from "./observer/backfill.js";
 import { forgetSessions, sessionsForRepo } from "./observer/forget.js";
+import { autoInstallTargets, detectHosts, getHostAdapter, HOST_ADAPTERS } from "./observer/hosts/registry.js";
+import type { HostAdapter } from "./observer/hosts/types.js";
+import { importEntireCheckpoints } from "./observer/importers/entire.js";
+import { agentTraceStorePath, readAgentTraces, storeAgentTraces } from "./codeintel/attribution.js";
+import { homedir } from "os";
 import {
   buildRepoGraph,
   buildStructuralDigest,
@@ -487,16 +491,49 @@ observeCmd
     console.log(`Story candidates in inbox: ${journal.readInboxCount()}`);
   });
 
+function installTargets(opts: { host?: string[]; all?: boolean }): HostAdapter[] {
+  if (opts.all) return autoInstallTargets(homedir());
+  return (opts.host ?? []).map((h) => {
+    const a = getHostAdapter(h);
+    if (!a) throw new Error(`Unknown host "${h}". Hosts: ${Object.keys(HOST_ADAPTERS).join(", ")}`);
+    return a;
+  });
+}
+
+function printHosts(): void {
+  console.log("Hosts (✓ = detected on this machine):");
+  for (const { adapter, detected } of detectHosts(homedir())) {
+    const tag = adapter.confidence === "verified" ? "" : ` [${adapter.confidence}]`;
+    console.log(`  ${detected ? "✓" : " "} ${adapter.name.padEnd(12)} ${adapter.label}${tag}`);
+    if (adapter.notes) console.log(`      ${adapter.notes}`);
+  }
+}
+
+observeCmd
+  .command("hosts")
+  .description("List supported hosts, which are installed here, and how sure we are of each payload schema")
+  .action(() => printHosts());
+
 observeCmd
   .command("install")
-  .description("Write the observer hooks into Claude Code settings.json")
+  .description("Write observer hooks for agent hosts (Claude Code, Codex, Cursor, Gemini CLI, Copilot CLI, Kiro) or git")
+  .option("--host <names...>", "Hosts to install for (see `skill-forge observe hosts`)")
+  .option("--all", "Every detected host with a verified or partial schema (never Kiro or git)")
   .option("--scope <scope>", "user | project", "user")
   .action((opts) => {
     try {
       if (!["user", "project"].includes(opts.scope)) throw new Error("--scope must be user or project");
-      const path = claudeSettingsPath(opts.scope);
-      const { added } = installObserverHooks(path);
-      console.log(`✓ Observer hooks written to ${path} (${added.join(", ")})`);
+      const targets = installTargets(opts);
+      if (targets.length === 0) {
+        printHosts();
+        console.log("\nNothing written. Re-run with --host <name…> or --all.");
+        return;
+      }
+      for (const adapter of targets) {
+        const { path, events } = adapter.install({ home: homedir(), projectDir: process.cwd(), scope: opts.scope });
+        console.log(`✓ ${adapter.label}: ${path} (${events.join(", ")})`);
+        if (adapter.notes) console.log(`  note: ${adapter.notes}`);
+      }
       console.log("  Capture is a no-op until a repository is enabled: `skill-forge observe enable`.");
     } catch (err) {
       fail(err);
@@ -505,13 +542,15 @@ observeCmd
 
 observeCmd
   .command("uninstall")
-  .description("Remove the observer hooks from Claude Code settings.json")
+  .description("Remove observer hooks for the given hosts (default: claude-code)")
+  .option("--host <names...>", "Hosts to uninstall", ["claude-code"])
   .option("--scope <scope>", "user | project", "user")
   .action((opts) => {
     try {
-      const path = claudeSettingsPath(opts.scope);
-      const { removed } = uninstallObserverHooks(path);
-      console.log(removed ? `✓ Observer hooks removed from ${path}` : `No observer hooks in ${path}`);
+      for (const adapter of installTargets({ host: opts.host })) {
+        const { path, removed } = adapter.uninstall({ home: homedir(), projectDir: process.cwd(), scope: opts.scope });
+        console.log(removed ? `✓ ${adapter.label}: removed from ${path}` : `- ${adapter.label}: nothing to remove in ${path}`);
+      }
     } catch (err) {
       fail(err);
     }
@@ -692,6 +731,43 @@ program
       const sessions = opts.session ? [opts.session] : sessionsForRepo(journal, opts.repo);
       const r = forgetSessions(sessions, journal, ledger);
       console.log(`✓ Forgot ${r.sessions.length} session(s) and ${r.stories.length} observer stor${r.stories.length === 1 ? "y" : "ies"}.`);
+    } catch (err) {
+      fail(err);
+    }
+  });
+
+// ── importers ──────────────────────────────────────────────────────────────
+const importCmd = program.command("import").description("Import evidence from other tools (Entire checkpoints, Agent Trace records)");
+
+importCmd
+  .command("entire")
+  .description("Import Entire CLI checkpoints of this repository into the observer journal [unverified listing schema]")
+  .option("--limit <n>", "Most recent checkpoints to import", "50")
+  .option("--no-llm", "Import only; skip the observer/reflector passes")
+  .action(async (opts) => {
+    try {
+      const r = importEntireCheckpoints({ limit: Number(opts.limit) || 50 });
+      for (const s of r.skipped) console.log(`- ${s.checkpoint}: ${s.reason}`);
+      console.log(`✓ Imported ${r.imported.length} checkpoint(s).`);
+      if (!opts.llm) return;
+      for (const i of r.imported) {
+        const res = await reflectSession(i.session, { regenerate: false });
+        console.log(res.story ? `  ✓ ${i.checkpoint} → ${res.story.title}` : `  - ${i.checkpoint}: ${res.skipped}`);
+      }
+    } catch (err) {
+      fail(err);
+    }
+  });
+
+importCmd
+  .command("agent-trace")
+  .description("Import Agent Trace records (agent-trace.dev) so code facts can attribute AI-written lines")
+  .argument("<paths...>", "Trace files (.json / .jsonl) or directories")
+  .action((paths: string[]) => {
+    try {
+      const { records, invalid } = readAgentTraces(paths);
+      const added = storeAgentTraces(records);
+      console.log(`✓ Imported ${added} new trace record(s) (${records.length - added} already known, ${invalid} invalid) into ${agentTraceStorePath()}`);
     } catch (err) {
       fail(err);
     }

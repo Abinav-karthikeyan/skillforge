@@ -8,6 +8,35 @@ back-compatible renames).
 
 Work toward the v3 roadmap in `plan_v3.md`, one phase at a time.
 
+### Phase 3.3 — Cross-host observation
+- **Host adapters** (`src/observer/hosts/`): each adapter owns payload parsing (session, cwd,
+  transcript, events) and its host's hook config. All of them translate into the shared
+  normalizer, so redaction, detectors, observer, and reflector are identical across hosts.
+  - Claude Code, Gemini CLI, and GitHub Copilot CLI: **verified** against primary docs (2026-10).
+  - Codex CLI: **partial** (shell argv and `apply_patch` shapes inferred; no failure event,
+    so exit codes come from the response).
+  - Cursor: **partial** (no shell exit code, so failures are inferred from output).
+  - Kiro: **unverified** (STDIN keys unpublished); never auto-installed.
+  - git: `post-commit` floor.
+- **git floor:** writes `post-commit` where `core.hooksPath` points (husky-safe). It appends to
+  existing shell hooks, chains non-shell hooks, and uninstall restores them. Sessions are
+  per repo per day. The hook runs in the background with no stdin, so a commit never waits.
+- **Cross-host commit dedupe:** a commit journaled by one host (an agent's tool hook, or git's
+  `post-commit`) isn't checkpointed twice, in either order.
+- `skill-forge observe hosts`; `observe install --host <names…> | --all [--scope]` (`--all`
+  covers only detected hosts with a verified or partial schema); `observe uninstall --host`.
+  Cursor's `beforeSubmitPrompt` gets a `{continue:true}` acknowledgement so prompts are never
+  blocked; Copilot's payloads get their event name via `--event`.
+- **Importers:** `skill-forge import entire` (Entire CLI checkpoints through the documented
+  `checkpoint list --json` / `explain --raw-transcript`; tolerant of the unpublished listing
+  schema) and `skill-forge import agent-trace` (Agent Trace 0.1.0 records). Code facts gain
+  `attribution` (AI / human / mixed lines) for commits with traces, and translators must
+  describe AI-written work as AI-assisted.
+- Exit criterion: the three gold sessions, translated into the documented payload shapes of
+  Codex, Cursor, Gemini CLI, and Copilot CLI, reach 100% detector recall on every host (these
+  are synthesized fixtures, not recordings).
+- VS Code extension deferred to v4 (plan decision 5).
+
 ### Phase 3.2 — Always-on observer (Claude Code first)
 - **Capture (hot path):** new `skill-forge-observe` bin for Claude Code hooks (SessionStart,
   UserPromptSubmit, PostToolUse(Failure), Stop, SubagentStop, Pre/PostCompact, SessionEnd).

@@ -115,6 +115,19 @@ export const CodeFactsSchema = z.object({
   blast_radius: z.array(BlastRadiusSchema).default([]),
   /** Symbols named in diff hunk headers (L0 only). */
   hunk_symbols: z.array(z.string()).optional(),
+  /** Line attribution from imported Agent Trace records for these commits (agent-trace.dev). */
+  attribution: z
+    .object({
+      source: z.literal("agent-trace"),
+      ai_lines: z.number().int(),
+      human_lines: z.number().int(),
+      mixed_lines: z.number().int(),
+      unknown_lines: z.number().int(),
+      tools: z.array(z.string()).default([]),
+      models: z.array(z.string()).default([]),
+      records: z.number().int(),
+    })
+    .optional(),
   fingerprint: FingerprintSchema.optional(),
 });
 

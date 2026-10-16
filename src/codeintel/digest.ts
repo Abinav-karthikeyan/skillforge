@@ -10,13 +10,16 @@ import {
   changedFiles,
   commitSubjects,
   fileAt,
+  EMPTY_TREE,
   generatedOrVendored,
+  git,
   hunkSymbols,
   resolveRange,
   ResolvedRange,
   trackedFiles,
 } from "./git.js";
 import { languageForPath, languageLabel } from "./languages.js";
+import { AgentTraceRecord, attributionFor, loadAgentTraces } from "./attribution.js";
 import { isIgnoredPath, isLockfile, isTestPath } from "./paths.js";
 import { GENERIC_NAMES } from "./repo-map.js";
 import { loadCodeIntelRuntime } from "./runtime.js";
@@ -57,6 +60,8 @@ export interface DigestOptions {
   maxAnalyzedFiles?: number;
   /** Scan the working tree for test linkage and blast radius (default true). */
   scanRepo?: boolean;
+  /** Agent Trace records to attribute lines from (default: the imported store). */
+  traces?: AgentTraceRecord[];
 }
 
 /** Max entity changes kept in `facts.entity_changes`; `facts.entities` counts stay complete. */
@@ -260,6 +265,14 @@ export async function buildStructuralDigest(opts: DigestOptions): Promise<Struct
         : buildFingerprint({ root, range, files, tracked, changes }),
   };
 
+  const traces = opts.traces ?? loadAgentTraces();
+  if (traces.length) {
+    const shas = (range.base === EMPTY_TREE ? [range.head] : git(root, ["rev-list", `${range.base}..${range.head}`], { allowFail: true }).split(/s+/))
+      .filter(Boolean);
+    const attribution = attributionFor(traces, shas);
+    if (attribution) facts.attribution = { source: "agent-trace", ...attribution };
+  }
+
   return { range, layer, files: digestFiles, skipped: skipped.map((f) => f.path), subjects, facts };
 }
 
@@ -356,6 +369,13 @@ export function renderDigest(d: StructuralDigest, maxChars = 12_000): string {
     lines.push(`Blast radius (name-based, approximate): ${f.blast_radius.map((b) => `${b.symbol} ~${b.referencing_files} files`).join(", ")}`);
   }
   if (f.hunk_symbols?.length) lines.push(`Symbols in changed hunks: ${f.hunk_symbols.join(", ")}`);
+  if (f.attribution) {
+    const a = f.attribution;
+    lines.push(
+      `Attribution (Agent Trace): ${a.ai_lines} AI-written, ${a.mixed_lines} mixed, ${a.human_lines} human, ${a.unknown_lines} unattributed lines` +
+        (a.tools.length ? ` via ${a.tools.join(", ")}` : "")
+    );
+  }
   if (f.fingerprint) {
     const fp = f.fingerprint;
     const bits = [

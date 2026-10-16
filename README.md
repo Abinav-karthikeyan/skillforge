@@ -340,7 +340,7 @@ A `/skill-forge` pass at the end of a long session sees a compacted transcript, 
 ```bash
 npm i -g @abhinavravich1999/skill-forge     # the hooks call the installed bins, never npx
 skill-forge observe enable                  # opt this repository in (add --confidential for employer code)
-skill-forge observe install                 # write the hooks into ~/.claude/settings.json
+skill-forge observe install --host claude-code   # write the hooks into ~/.claude/settings.json (see hosts below)
 # …or install the Claude Code plugin instead of `observe install`:
 #   /plugin marketplace add Abinav-karthikeyan/skillforge
 #   /plugin install skill-forge@skill-forge
@@ -362,6 +362,20 @@ How it works (plan_v3 §3):
 - **Privacy**: off by default and enabled per repository. Secrets are redacted before anything is written: API keys and tokens for 15+ providers, JWTs, private keys, connection-string passwords, `password=`/`secret=` assignments, and `.env` contents (a CI corpus test proves none survive). The journal stores file paths, never file contents. Raw journals expire after 30 days; `skill-forge forget --session <id> | --repo <path>` deletes everything observed. **Confidential repos** run the observer on a local Ollama model only, and the prompts abstract proprietary names.
 - **Never in the way**: capture hooks are `async`, always exit 0, and do nothing in repositories you haven't enabled. SessionStart prints a one-line notice when candidates are waiting. Question mode (opt-in, at most one question per session) asks what drove a decision.
 - **Models**: `observer_model` in config (default: your provider's cheap tier, e.g. `claude-haiku-5-5`); `observer_local_model` for confidential repos.
+- **Other hosts.** `skill-forge observe hosts` lists what's installed. `observe install --host <name…>` (or `--all` for every detected, documented host) writes each host's own hook config, merging idempotently with what's there:
+
+  | Host | Config written | Schema |
+  |---|---|---|
+  | Claude Code | `~/.claude/settings.json` (or the plugin) | verified |
+  | OpenAI Codex CLI | `~/.codex/hooks.json` (review and trust it with `/hooks` in Codex) | partial: shell argv and `apply_patch` shapes inferred; no failure event, so exit codes come from the response |
+  | Cursor | `~/.cursor/hooks.json` | partial: no shell exit code, so failures are inferred from output |
+  | Gemini CLI | `~/.gemini/settings.json` | verified (its docs say Antigravity CLI superseded it in June 2026) |
+  | GitHub Copilot CLI | `~/.copilot/hooks/skill-forge.json` | verified, local CLI only (the cloud coding agent's sandbox can't reach your journal) |
+  | Kiro | `~/.kiro/hooks/skill-forge.json` | **unverified**: payload keys aren't published, so it's never part of `--all` |
+  | git (any editor) | `post-commit` in `core.hooksPath` or `.git/hooks`, chained with existing hooks | verified: commits only |
+
+  Every host feeds the same journal, detectors, observer, and reflector; journals are namespaced per host (`codex:<id>`, `git:<repo>:<date>`). A commit seen by both an agent hook and git's `post-commit` is recorded once. The same three gold sessions, translated into each documented host's payload shape, pass the detector replay for Codex, Cursor, Gemini CLI, and Copilot CLI.
+- **Imports.** `skill-forge import entire` replays [Entire](https://docs.entire.io) checkpoints through capture, using `entire checkpoint list --json` and `explain --raw-transcript` (its listing schema is unpublished, so fields are read tolerantly; Claude Code transcripts only). `skill-forge import agent-trace <files…>` imports [Agent Trace](https://agent-trace.dev) records: code facts for those commits then carry line attribution (AI / human / mixed), and artifacts describe AI-written work as AI-assisted.
 - Settings live in `~/.skill-forge/observe.json` (`skill-forge observe status`). `npx tsx scripts/observer-replay.ts` runs the replay eval (observer recall vs an end-of-session pass) with your provider.
 
 ---

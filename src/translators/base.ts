@@ -133,6 +133,8 @@ const CODE_FACTS_RULE = [
   "    from 14 to 6, a newly exported interface) over generic descriptions.",
   "  - Frame the work to match `code_facts.classification`: a refactor is told as what got",
   "    simpler and why, not as new functionality.",
+  "  - If `code_facts.attribution` shows AI-written lines, describe that work as AI-assisted",
+  "    (what the engineer directed, reviewed, and decided) — never imply sole authorship of it.",
   "---",
 ].join("\n");
 

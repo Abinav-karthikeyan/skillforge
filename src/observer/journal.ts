@@ -248,6 +248,34 @@ export class Journal {
     writeFileAtomic(this.budgetPath(), JSON.stringify(calls));
   }
 
+  // ── commit registry (cross-host dedupe) ──────────────────────────────────
+
+  private commitsPath(): string {
+    return join(this.dir, "_commits.json");
+  }
+
+  private readCommits(): Record<string, Record<string, string>> {
+    try {
+      return JSON.parse(readFileSync(this.commitsPath(), "utf-8")) as Record<string, Record<string, string>>;
+    } catch {
+      return {};
+    }
+  }
+
+  /** The session that already journaled this commit in this repo, if any. */
+  commitOwner(repoKey: string, sha: string): string | undefined {
+    return this.readCommits()[repoKey]?.[sha.slice(0, 7)];
+  }
+
+  registerCommit(repoKey: string, sha: string, sessionId: string): void {
+    const all = this.readCommits();
+    const repo = (all[repoKey] ??= {});
+    repo[sha.slice(0, 7)] = sessionId;
+    const keys = Object.keys(repo);
+    for (const k of keys.slice(0, Math.max(0, keys.length - 500))) delete repo[k];
+    writeFileAtomic(this.commitsPath(), JSON.stringify(all));
+  }
+
   // ── inbox counter (written by the reflector, read by capture) ────────────
 
   private inboxPath(): string {

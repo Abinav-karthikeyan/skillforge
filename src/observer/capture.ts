@@ -2,23 +2,25 @@ import { appendFileSync, mkdirSync, statSync } from "fs";
 import { join } from "path";
 import { logsDir } from "../config/paths.js";
 import { detect, Signal } from "./detectors.js";
+import { getHostAdapter } from "./hosts/registry.js";
+import type { HostAdapter } from "./hosts/types.js";
 import { Journal, JournalEvent } from "./journal.js";
-import { ClaudeCodePayload, normalizeClaudeCode, NormalizedEvent } from "./normalize.js";
-import { loadObserveSettings, ObserveSettings, repoPolicy } from "./settings.js";
+import { loadObserveSettings, normalizeRepoPath, ObserveSettings, repoPolicy } from "./settings.js";
 import { spawnDetachedWorker } from "./spawn.js";
 
 /**
- * The capture hot path (plan_v3 §3.3): parse the hook payload, check the repo
- * is opted in, normalize + redact, append to the journal, run the boundary
- * detectors, and — at a milestone — spawn a detached observer. No LLM call, no
- * SDK import, never blocks the host, never throws.
+ * The capture hot path (plan_v3 §3.3): parse the hook payload with the host's
+ * adapter, check the repo is opted in, normalize + redact, append to the
+ * journal, run the boundary detectors, and — at a milestone — spawn a detached
+ * observer. No LLM call, no SDK import, never blocks the host, never throws.
  */
-export type HostNormalizer = (payload: unknown) => NormalizedEvent[];
-
 export interface CaptureOptions {
+  /** Host name (see ./hosts/registry.ts). Default: claude-code. */
   host?: string;
-  /** Payload → events for `host`. Defaults to Claude Code's normalizer. */
-  normalize?: HostNormalizer;
+  /** Explicit adapter (overrides `host`). */
+  adapter?: HostAdapter;
+  /** Event name supplied on the command line, for hosts whose payload omits it. */
+  eventName?: string;
   settings?: ObserveSettings;
   journal?: Journal;
   now?: () => Date;
@@ -30,57 +32,83 @@ export interface CaptureResult {
   recorded: string[];
   signals: Signal[];
   spawned: string[][];
-  /** JSON to print on stdout for the host (systemMessage / additionalContext). */
+  /** JSON to print on stdout for the host (systemMessage / additionalContext / ack). */
   output?: Record<string, unknown>;
   skipped?: string;
 }
 
-interface CommonPayload {
-  session_id?: string;
-  cwd?: string;
-  transcript_path?: string;
-  hook_event_name?: string;
-}
-
 const MAX_PENDING_SIGNALS = 50;
+
+/** Journal key: Claude Code ids stay as-is (v3.2 journals); other hosts are namespaced. */
+export function journalSessionId(host: string, raw: string | undefined, fallback: string): string {
+  const id = raw || fallback;
+  return host === "claude-code" ? id : `${host}:${id}`;
+}
 
 export function capturePayload(raw: string, opts: CaptureOptions = {}): CaptureResult {
   const result: CaptureResult = { recorded: [], signals: [], spawned: [] };
-  let payload: CommonPayload;
+  let payload: Record<string, unknown>;
   try {
-    payload = JSON.parse(raw) as CommonPayload;
+    payload = raw.trim() ? (JSON.parse(raw) as Record<string, unknown>) : {};
   } catch {
     return { ...result, skipped: "unparseable payload" };
   }
-  if (!payload || typeof payload !== "object") return { ...result, skipped: "unparseable payload" };
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return { ...result, skipped: "unparseable payload" };
+  if (opts.eventName && payload.hook_event_name === undefined) payload.hook_event_name = opts.eventName;
 
-  const host = opts.host ?? "claude-code";
-  const settings = opts.settings ?? loadObserveSettings();
-  const policy = repoPolicy(payload.cwd ?? process.cwd(), settings);
-  if (!policy.enabled) return { ...result, skipped: "observation not enabled for this repository" };
-
+  const adapter = opts.adapter ?? getHostAdapter(opts.host ?? "claude-code");
+  if (!adapter) return { ...result, skipped: `unknown host "${opts.host}"` };
+  const host = adapter.name;
   const now = (opts.now ?? (() => new Date()))();
   const nowIso = now.toISOString();
-  const sessionId = payload.session_id || `${host}-${nowIso.slice(0, 10)}`;
+
+  let parsed;
+  try {
+    parsed = adapter.parse(payload, { cwd: process.cwd(), now });
+  } catch {
+    parsed = null;
+  }
+  if (!parsed) return { ...result, skipped: "payload not recognized by the host adapter" };
+
+  const settings = opts.settings ?? loadObserveSettings();
+  const policy = repoPolicy(parsed.cwd ?? process.cwd(), settings);
+  if (!policy.enabled) return { ...result, output: parsed.ack, skipped: "observation not enabled for this repository" };
+  if (parsed.events.length === 0) return { ...result, output: parsed.ack, skipped: "no events in payload" };
+
+  const sessionId = journalSessionId(host, parsed.sessionId, nowIso.slice(0, 10));
   const journal = opts.journal ?? new Journal();
   const spawn = opts.spawn ?? spawnDetachedWorker;
-  const normalize = opts.normalize ?? ((p: unknown) => normalizeClaudeCode(p as ClaudeCodePayload));
+  const transcriptPath = parsed.transcriptPath;
+  const repoKey = normalizeRepoPath(policy.repo!);
+
+  // Commit dedupe across hosts: the same commit may arrive from an agent's
+  // tool hook and from git's post-commit. First writer keeps the checkpoint.
+  const normalized = parsed.events.flatMap((n) => {
+    const sha = n.kind === "commit" && typeof n.payload.sha === "string" ? (n.payload.sha as string) : undefined;
+    if (!sha) return [n];
+    const owner = journal.commitOwner(repoKey, sha);
+    if (owner && owner !== sessionId) {
+      return host === "git" ? [] : [{ ...n, kind: "tool_result" as const, payload: { ...n.payload, duplicate_of: owner } }];
+    }
+    journal.registerCommit(repoKey, sha, sessionId);
+    return [n];
+  });
+  if (normalized.length === 0) return { ...result, output: parsed.ack, skipped: "commit already observed by another session" };
 
   const release = journal.lockState(sessionId);
   try {
     const state = journal.loadState(sessionId) ?? journal.newState(sessionId, host, policy.repo, policy.confidential, nowIso);
-    if (payload.transcript_path) state.transcript_path = payload.transcript_path;
+    if (transcriptPath) state.transcript_path = transcriptPath;
 
     let transcriptOffset: number | undefined;
-    if (payload.transcript_path) {
+    if (transcriptPath) {
       try {
-        transcriptOffset = statSync(payload.transcript_path).size;
+        transcriptOffset = statSync(transcriptPath).size;
       } catch {
         /* transcript may lag or be absent */
       }
     }
 
-    const normalized = normalize(payload);
     const events: JournalEvent[] = normalized.map((n) => {
       const seq = ++state.seq;
       return {
@@ -92,8 +120,8 @@ export function capturePayload(raw: string, opts: CaptureOptions = {}): CaptureR
         ts: nowIso,
         kind: n.kind,
         payload: n.payload,
-        ...(transcriptOffset !== undefined && payload.transcript_path
-          ? { transcript_ref: { path: payload.transcript_path, offset: transcriptOffset, length: 0 } }
+        ...(transcriptOffset !== undefined && transcriptPath
+          ? { transcript_ref: { path: transcriptPath, offset: transcriptOffset, length: 0 } }
           : {}),
         redacted: true as const,
       };
@@ -160,7 +188,7 @@ export function capturePayload(raw: string, opts: CaptureOptions = {}): CaptureR
         state.question_asked = true;
         result.output = {
           hookSpecificOutput: {
-            hookEventName: payload.hook_event_name ?? "Stop",
+            hookEventName: typeof payload.hook_event_name === "string" ? payload.hook_event_name : "Stop",
             additionalContext:
               "skill-forge (question mode, at most once per session): when it fits naturally, ask the user ONE short " +
               "question — what drove the decision they described earlier (the alternatives they weighed and why this one won)? " +
@@ -170,6 +198,7 @@ export function capturePayload(raw: string, opts: CaptureOptions = {}): CaptureR
       }
     }
 
+    result.output ??= parsed.ack;
     state.updated_at = nowIso;
     journal.saveState(state);
     return result;
@@ -208,13 +237,17 @@ function readStdin(timeoutMs: number): Promise<string> {
 
 /** `skill-forge-observe [--host <name>]` — the hook entry point. Always exits 0. */
 export async function runCaptureMain(argv: string[]): Promise<void> {
-  const hostIdx = argv.indexOf("--host");
-  const host = hostIdx !== -1 ? argv[hostIdx + 1] : "claude-code";
+  const arg = (name: string) => {
+    const i = argv.indexOf(name);
+    return i !== -1 ? argv[i + 1] : undefined;
+  };
+  const host = arg("--host") ?? "claude-code";
+  const eventName = arg("--event");
   let output = "";
   try {
     const raw = await readStdin(1_500);
     const started = process.hrtime.bigint();
-    const result = capturePayload(raw, { host });
+    const result = capturePayload(raw, { host, eventName });
     const ms = Number(process.hrtime.bigint() - started) / 1e6;
     if (process.env.SKILL_FORGE_OBSERVE_TIMING) log("observe-timing.log", `${ms.toFixed(2)}ms ${result.recorded.length} event(s)`);
     if (result.output) output = JSON.stringify(result.output);
