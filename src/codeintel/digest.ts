@@ -267,7 +267,7 @@ export async function buildStructuralDigest(opts: DigestOptions): Promise<Struct
 
   const traces = opts.traces ?? loadAgentTraces();
   if (traces.length) {
-    const shas = (range.base === EMPTY_TREE ? [range.head] : git(root, ["rev-list", `${range.base}..${range.head}`], { allowFail: true }).split(/s+/))
+    const shas = (range.base === EMPTY_TREE ? [range.head] : git(root, ["rev-list", `${range.base}..${range.head}`], { allowFail: true }).split(/\s+/))
       .filter(Boolean);
     const attribution = attributionFor(traces, shas);
     if (attribution) facts.attribution = { source: "agent-trace", ...attribution };

@@ -381,5 +381,11 @@ describe("Agent Trace attribution", () => {
     expect(renderDigest(digest)).toContain("Attribution (Agent Trace): 10 AI-written, 0 mixed, 5 human");
     const none = await buildStructuralDigest({ root: box.repo.root, runtime: null, traces: [] });
     expect(none.facts.attribution).toBeUndefined();
+
+    // A multi-commit range attributes every commit that has a trace.
+    box.repo.write({ "src/b.ts": "export const b = 2;\n" }).commit("feat: b");
+    const sha2 = box.repo.git("rev-parse", "HEAD").trim();
+    const both = await buildStructuralDigest({ root: box.repo.root, runtime: null, range: "HEAD~2..HEAD", traces: [record(sha) as never, record(sha2) as never] });
+    expect(both.facts.attribution).toMatchObject({ ai_lines: 20, human_lines: 10, records: 2 });
   });
 });
