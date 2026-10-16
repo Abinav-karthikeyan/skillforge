@@ -46,15 +46,16 @@ export interface CalibrationConfig {
   focus?: string | string[];
   focus_effort?: FocusEffort;
   focus_deadline_ms?: number;
-  // Which subagent runtime to use for orchestrator-spawned turns (currently
-  // only the focus scout). "auto" and unknown values resolve to the inline
-  // runtime; "claude-sdk" / "openai-agents" are reserved for SDK-backed
-  // implementations that will register in src/orchestrator/subagent/factory.ts.
+  // Which subagent runtime to use for orchestrator-spawned turns (the focus
+  // scout today). "auto" / "inline" use the portable JSON-envelope loop;
+  // "native" uses the provider's own tool calling when available;
+  // "claude-sdk" / "openai-agents" pin native Anthropic / OpenAI tool use.
+  // See src/orchestrator/subagent/factory.ts.
   subagent_runtime?: SubagentRuntimeSelection;
 }
 
 export type FocusEffort = "low" | "medium" | "off";
-export type SubagentRuntimeSelection = "auto" | "inline" | "claude-sdk" | "openai-agents";
+export type SubagentRuntimeSelection = "auto" | "inline" | "native" | "claude-sdk" | "openai-agents";
 
 export const DEFAULT_CALIBRATION: CalibrationConfig = {
   experience_level: "senior",

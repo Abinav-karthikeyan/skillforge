@@ -3,8 +3,14 @@
     "PostToolUse": [
       {
         "matcher": "Bash",
-        "pattern": "git commit",
-        "command": "npx @abhinavravich1999/skill-forge generate --mode portfolio-bullet"
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(git commit*)",
+            "command": "skill-forge hook post-commit --mode portfolio-bullet",
+            "async": true
+          }
+        ]
       }
     ]
   }

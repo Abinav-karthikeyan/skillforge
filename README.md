@@ -146,7 +146,7 @@ Or add it to `.mcp.json` directly — see [claude-code-integration/mcp/.mcp.json
 
 ### 5. (Optional) Install the git commit hook
 
-Fire skill-forge on every commit — no session required, no extra steps:
+Fire skill-forge after every commit Claude Code makes. It runs in the background and never blocks the session:
 
 ```json
 {
@@ -154,15 +154,26 @@ Fire skill-forge on every commit — no session required, no extra steps:
     "PostToolUse": [
       {
         "matcher": "Bash",
-        "pattern": "git commit",
-        "command": "npx @abhinavravich1999/skill-forge generate --mode portfolio-bullet"
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(git commit*)",
+            "command": "skill-forge hook post-commit --mode portfolio-bullet",
+            "async": true
+          }
+        ]
       }
     ]
   }
 }
 ```
 
-Add this to `~/.claude/settings.json` under `hooks`.
+Add this to `~/.claude/settings.json` (or a project's `.claude/settings.json`). Notes:
+
+- **Install the CLI globally first** (`npm i -g @abhinavravich1999/skill-forge`). The hook calls the `skill-forge` bin directly; `npx` would add a multi-second cold resolve to every commit.
+- `if` uses permission-rule syntax, so only `git commit` Bash calls trigger it. `async: true` runs it in the background.
+- `skill-forge hook post-commit` reads the hook payload on stdin, generates from the new commit's git context, and **always exits 0**. Results and errors go to `~/.skill-forge/logs/hook.log`.
+- The reference config lives at [claude-code-integration/hooks/post-session.json](claude-code-integration/hooks/post-session.json).
 
 ### 6. (Optional) Connect to Notion
 
@@ -346,6 +357,14 @@ diff test-output/eval/<timestamp>/debugging-memory-leak/interview-qa-v1.md \
 
 To add a new prompt version: create `src/prompts/<mode>/v2.txt`, add it to `src/prompts/manifest.yaml`, then run eval before updating `active`.
 
+Add `--judge` to score every output with the judge rubric (one extra LLM call per output). Scores land in `scores.json`, and `README.md` in the eval dir gets a per-artifact table plus the mean overall per `mode@version`, the number a prompt change has to move:
+
+```bash
+npx tsx scripts/prompt-eval.ts --versions v1,v2 --modes interview-qa --judge
+```
+
+Four dimensions come from the rubric prompt (`src/prompts/judge/`). **Metric honesty** is deterministic: every number the artifact states must appear in the session summary (or its evidence). Invented metrics fail it on every run.
+
 ---
 
 ## Configuration
@@ -427,6 +446,22 @@ skill-forge share
 # Host-delivery: render + return the artifact for the host to deliver (Gemini Notebook, Slack, …)
 skill-forge generate --mode technical-deep-dive --connector return_only --json session.json
 
+# Living artifact: regenerate in place (versioned; previous body archived under versions/)
+skill-forge generate --mode portfolio-bullet --json session.json --story rate-limiter
+
+# Score an artifact (STAR, specificity, groundedness, metric honesty, calibration)
+skill-forge judge ~/.skill-forge/artifacts/<file>.md --json session.json
+skill-forge judge --story rate-limiter
+
+# Story ledger
+skill-forge stories                  # list stories (ledger + legacy index.yml artifacts)
+skill-forge stories show <id>        # one story as JSON
+skill-forge stories migrate          # persist legacy artifacts as one-version stories
+skill-forge stories approve <id>     # or: discard <id>
+
+# Hook entry point (reads the hook payload on stdin; always exits 0)
+skill-forge hook post-commit --mode portfolio-bullet
+
 # Override output directory
 skill-forge generate --mode all --output-dir ./my-artifacts
 
@@ -441,8 +476,13 @@ skill-forge auth status          # show which connectors are authenticated
 
 ```
 src/
-  types/          # Zod schemas — SessionSummary, TranslatorOutput, CalibrationConfig
-  claude/         # LLM client — provider factory + Anthropic / OpenAI-compatible providers
+  types/          # Zod schemas — SessionSummary, TranslatorOutput, CalibrationConfig, ledger (Event/Observation/Story), Evidence
+  claude/         # LLM client — provider factory + Anthropic / OpenAI-compatible providers (chat + native tool loops)
+  pipeline/       # generate.ts — shared translate → write → record-story pipeline (CLI, MCP, hook)
+  ledger/         # Story ledger (stories, observations, evidence) + legacy index.yml migration
+  eval/           # Judge rubric + deterministic metric-honesty check
+  hooks/          # Host hook entry points (post-commit)
+  orchestrator/   # Focus scout, named budget tiers, subagent runtimes (inline / native)
   config/         # Config loader (project-root → home fallback chain), .env loader
   adapters/       # Input adapters — git context (hook path), stdin/file (slash command path)
   ingestor/       # Normalizes all input paths into a typed SessionSummary

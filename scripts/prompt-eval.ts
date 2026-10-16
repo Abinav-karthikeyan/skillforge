@@ -11,6 +11,12 @@
  *   npx tsx scripts/prompt-eval.ts --modes interview-qa,portfolio-bullet
  *   npx tsx scripts/prompt-eval.ts --fixtures debugging-memory-leak,greenfield-auth-service
  *   npx tsx scripts/prompt-eval.ts --versions v1,v2 --modes interview-qa
+ *   npx tsx scripts/prompt-eval.ts --judge          # also score every output (v3 judge)
+ *
+ * With --judge, each output is scored on STAR completeness, specificity,
+ * groundedness, metric honesty, and calibration fit; scores land in
+ * scores.json and a comparable table in README.md. Judging makes one extra
+ * LLM call per output.
  */
 
 import { readFileSync, writeFileSync, mkdirSync, readdirSync } from "fs";
@@ -29,6 +35,7 @@ async function main() {
   const versionsArg = flag("versions");
   const modesArg = flag("modes");
   const fixturesArg = flag("fixtures");
+  const judge = args.includes("--judge");
 
   type Mode = "interview-qa" | "portfolio-bullet" | "technical-deep-dive";
   const ALL_MODES: Mode[] = ["interview-qa", "portfolio-bullet", "technical-deep-dive"];
@@ -68,6 +75,15 @@ async function main() {
   const { translatePortfolioBullet } = await import("../src/translators/portfolio-bullet.js");
   const { translateTechnicalDeepDive } = await import("../src/translators/technical-deep-dive.js");
   const { SessionSummarySchema } = await import("../src/types/session.js");
+  const { judgeArtifact, formatJudgeTable } = await import("../src/eval/judge.js");
+  type JudgeRow = {
+    label: string;
+    fixture: string;
+    mode: Mode;
+    version: string;
+    result: Awaited<ReturnType<typeof judgeArtifact>>;
+  };
+  const judged: JudgeRow[] = [];
 
   const config = loadCalibration();
   const client = createClient({
@@ -142,8 +158,18 @@ async function main() {
           ].join("\n");
           writeFileSync(outFile, header + content, "utf-8");
 
-          console.log(`✓ (${elapsed}ms)`);
-          summary.push(`- [${mode}@${version}](./${fixtureName}/${mode}-${version}.md) — ${elapsed}ms`);
+          let scoreNote = "";
+          if (judge) {
+            try {
+              const result = await judgeArtifact(client, { mode, artifact: content, session, config });
+              judged.push({ label: `${fixtureName} · ${mode}@${version}`, fixture: fixtureName, mode, version, result });
+              scoreNote = ` · judge ${result.overall}`;
+            } catch (err) {
+              scoreNote = ` · judge failed: ${(err as Error).message.slice(0, 60)}`;
+            }
+          }
+          console.log(`✓ (${elapsed}ms)${scoreNote}`);
+          summary.push(`- [${mode}@${version}](./${fixtureName}/${mode}-${version}.md) — ${elapsed}ms${scoreNote}`);
         } catch (err) {
           const elapsed = Date.now() - start;
           console.log(`✗ ${(err as Error).message.slice(0, 80)}`);
@@ -152,6 +178,27 @@ async function main() {
       }
     }
     summary.push("");
+  }
+
+  // --- Judge scores ---
+  if (judge && judged.length > 0) {
+    writeFileSync(join(evalDir, "scores.json"), JSON.stringify(judged, null, 2), "utf-8");
+    // Mean overall per mode@version — the number a prompt change has to move.
+    const groups = new Map<string, number[]>();
+    for (const row of judged) {
+      const key = `${row.mode}@${row.version}`;
+      groups.set(key, [...(groups.get(key) ?? []), row.result.overall]);
+    }
+    const meansTable = [
+      "| mode@version | n | mean overall |",
+      "| --- | --- | --- |",
+      ...[...groups].map(
+        ([key, xs]) => `| ${key} | ${xs.length} | **${(xs.reduce((a, b) => a + b, 0) / xs.length).toFixed(2)}** |`
+      ),
+    ].join("\n");
+    const table = formatJudgeTable(judged.map((r) => ({ label: r.label, result: r.result })));
+    summary.push("## Judge scores\n", table, "", meansTable, "");
+    console.log(`\n${table}\n\n${meansTable}`);
   }
 
   // --- Write index ---

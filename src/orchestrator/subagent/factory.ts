@@ -1,33 +1,44 @@
-import { LLMClient } from "../../claude/types.js";
+import { LLMClient, NativeToolProtocol } from "../../claude/types.js";
 import { CalibrationConfig, SubagentRuntimeSelection } from "../../types/config.js";
 import { SubagentRuntime } from "./types.js";
 import { InlineRuntime } from "./inline.js";
+import { NativeToolRuntime } from "./native.js";
 
 /**
- * Picks a SubagentRuntime based on config. Today "auto" and any unknown value
- * both resolve to InlineRuntime — the SDK-backed runtimes will register here
- * as they land. Keeping the factory small means the conductor never has to
- * grow a switch statement of its own.
+ * Picks a SubagentRuntime based on config.
+ *
+ *   auto | inline   → InlineRuntime (JSON-envelope loop over plain chat; the
+ *                     portable floor, and still the default)
+ *   native          → provider-native tool calling when the configured
+ *                     provider supports it, else inline
+ *   claude-sdk      → native Anthropic Messages tool use (inline unless the
+ *                     provider is Anthropic)
+ *   openai-agents   → native Chat Completions function calling (inline
+ *                     unless the provider is OpenAI-compatible)
+ *
+ * A selection the provider can't honor degrades to inline rather than
+ * erroring, so an eager config value never breaks generation.
  */
 export function createSubagentRuntime(
   client: LLMClient,
   config: CalibrationConfig
 ): SubagentRuntime {
   const requested: SubagentRuntimeSelection = config.subagent_runtime ?? "auto";
+  const native = client.nativeTools;
+  const nativeFor = (protocol: NativeToolProtocol): SubagentRuntime =>
+    native && native.protocol === protocol
+      ? new NativeToolRuntime(client, native, protocol === "anthropic" ? "claude-sdk" : "openai-agents")
+      : new InlineRuntime(client);
 
   switch (requested) {
+    case "native":
+      return native ? nativeFor(native.protocol) : new InlineRuntime(client);
+    case "claude-sdk":
+      return nativeFor("anthropic");
+    case "openai-agents":
+      return nativeFor("openai");
     case "inline":
     case "auto":
-      return new InlineRuntime(client);
-
-    case "claude-sdk":
-    case "openai-agents":
-      // Not yet implemented — fall through to inline so an eager config value
-      // doesn't break users. Once the SDK-backed runtimes land they replace
-      // these branches; until then, callers requesting them still get the
-      // portable floor rather than an error.
-      return new InlineRuntime(client);
-
     default:
       return new InlineRuntime(client);
   }

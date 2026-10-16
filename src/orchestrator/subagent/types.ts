@@ -1,8 +1,8 @@
 /**
  * SubagentRuntime — abstraction for "run a bounded, structured LLM turn on
- * behalf of the orchestrator." Today the only implementation is `InlineRuntime`
- * (a plain LLMClient.chat() call); future implementations will wrap the
- * Claude Agent SDK, the OpenAI Agents SDK, or a host-delegated subagent.
+ * behalf of the orchestrator." `InlineRuntime` (JSON-envelope tool loop over
+ * plain chat) is the portable floor; `NativeToolRuntime` runs the same bounded
+ * loop through a provider's own tool-calling API (./native.ts).
  *
  * The conductor (runFocusScout) owns the budget decision (which tier maps to
  * which SubagentSpec knobs) and the fallback ladder. Runtimes only own the
@@ -15,8 +15,8 @@ export interface SubagentRuntime {
 
 export type SubagentRuntimeName =
   | "inline"
-  | "claude-sdk"        // reserved for @anthropic-ai/claude-agent-sdk
-  | "openai-agents";    // reserved for OpenAI Agents SDK
+  | "claude-sdk"        // native Anthropic Messages tool use
+  | "openai-agents";    // native OpenAI Chat Completions function calling
 
 export interface SubagentSpec {
   /** Full system prompt — already interpolated by the caller. */

@@ -1,0 +1,33 @@
+You are a strict evaluator of career artifacts generated from a software engineer's coding session. You grade ONE artifact against the session summary it was generated from. You do not rewrite it.
+
+Artifact mode: {mode}
+Candidate seniority: {experience_level}
+Target role: {target_role}
+
+Score each dimension from 1 (poor) to 5 (excellent). Be calibrated: 3 is "acceptable, nothing special"; reserve 5 for artifacts a hiring manager would remember.
+
+1. star_completeness — interview-qa ONLY. Does every answer have a concrete Situation, Task, Action (specific decisions and why), and Result (outcome + reflection)? For any other mode, set this dimension to null.
+2. specificity — Are claims concrete and specific to THIS session (named components, decisions, failure modes), or generic filler that could describe any project?
+3. groundedness — Is every factual claim (what was built, decided, tried, or achieved) supported by the session summary or its evidence entries? List each claim you cannot trace back in `unsupported_claims` (short paraphrases). Comparisons to other systems or tools count as claims and need an evidence entry. Score 5 only if `unsupported_claims` is empty.
+4. calibration_fit — Does the framing, scope, and vocabulary fit a {experience_level} engineer (ownership, scope of impact, technical depth)? Overclaiming and underclaiming both lose points.
+
+Do NOT score numeric honesty — it is checked deterministically elsewhere.
+
+Return ONLY valid JSON — no markdown fences, no prose — in exactly this shape:
+
+{
+  "star_completeness": { "score": 1, "rationale": "<one sentence>" },
+  "specificity": { "score": 1, "rationale": "<one sentence>" },
+  "groundedness": { "score": 1, "rationale": "<one sentence>", "unsupported_claims": ["<claim>"] },
+  "calibration_fit": { "score": 1, "rationale": "<one sentence>" }
+}
+
+(For modes other than interview-qa, "star_completeness" is null.)
+
+Session summary (JSON) — the only ground truth:
+{session_summary_json}
+
+Artifact to grade:
+<<<ARTIFACT
+{artifact}
+ARTIFACT>>>

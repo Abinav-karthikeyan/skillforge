@@ -94,6 +94,21 @@ export function resolveArtifactsDir(preferred?: string): string {
   return join(configDir(), "artifacts");
 }
 
+/**
+ * The story ledger (stories, observations, evidence) for an artifacts
+ * directory. It lives beside the artifacts it versions — as a dot-dir so it
+ * stays out of the way when output_dir points at a notes vault — which keeps
+ * `index.yml` and the ledger it is migrated into in one place.
+ */
+export function ledgerDirFor(artifactsDir: string): string {
+  return join(artifactsDir, ".ledger");
+}
+
+/** User-global log directory (hook runs, background workers). */
+export function logsDir(): string {
+  return join(configDir(), "logs");
+}
+
 /** Name of the env var that overrides the active prompt version. */
 export const PROMPT_VERSION_ENV = "SKILL_FORGE_PROMPT_VERSION";
 /** One-release alias for the prompt-version env var. */

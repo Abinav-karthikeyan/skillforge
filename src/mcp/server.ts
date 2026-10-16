@@ -6,10 +6,7 @@ import { z } from "zod";
 import { createClient, ProviderConfig } from "../claude/client.js";
 import { loadCalibration } from "../config/calibration.js";
 import { ingestSession } from "../ingestor/index.js";
-import { translatePortfolioBullet } from "../translators/portfolio-bullet.js";
-import { translateInterviewQA } from "../translators/interview-qa.js";
-import { translateTechnicalDeepDive } from "../translators/technical-deep-dive.js";
-import { createConnector, listConnectors } from "../output/connectors/factory.js";
+import { listConnectors } from "../output/connectors/factory.js";
 import { RETURN_ONLY, formatReturnOnly } from "../output/return-only.js";
 import { GistConnector } from "../output/connectors/gist.js";
 import { NotionConnector } from "../output/connectors/notion.js";
@@ -17,10 +14,9 @@ import { readLastArtifact } from "../output/last-artifact.js";
 import { readFileSync } from "fs";
 import { join } from "path";
 import { resolveArtifactsDir } from "../config/paths.js";
-import { SessionSummarySchema, TranslationMode, TranslatorOutput } from "../types/session.js";
-import { SessionSummary } from "../types/session.js";
-import { CalibrationConfig } from "../types/config.js";
-import { LLMClient } from "../claude/types.js";
+import { SessionSummarySchema } from "../types/session.js";
+import { generateArtifacts, resolveModes } from "../pipeline/generate.js";
+import { VERSION } from "../version.js";
 
 function parseFrontmatterArray(markdown: string, key: string): string[] {
   const match = markdown.match(new RegExp(`^${key}:\\s*\\[(.*)\\]`, "m"));
@@ -30,28 +26,10 @@ function parseFrontmatterArray(markdown: string, key: string): string[] {
 
 const server = new McpServer({
   name: "skill-forge",
-  version: "0.1.0",
+  version: VERSION,
 });
 
 const MODE_ENUM = z.enum(["interview-qa", "portfolio-bullet", "technical-deep-dive", "all"]);
-
-async function runTranslator(
-  mode: TranslationMode,
-  client: LLMClient,
-  session: SessionSummary,
-  config: CalibrationConfig,
-  promptVersion?: string,
-  focus?: string | string[]
-): Promise<TranslatorOutput> {
-  if (mode === "portfolio-bullet") return translatePortfolioBullet(client, session, config, promptVersion);
-  if (mode === "interview-qa") {
-    return translateInterviewQA(client, session, config, {
-      promptVersion,
-      focusOverride: focus,
-    });
-  }
-  return translateTechnicalDeepDive(client, session, config, promptVersion);
-}
 
 const generateToolConfig = {
   title: "Generate skill-forge artifact",
@@ -68,7 +46,8 @@ const generateToolConfig = {
       .optional()
       .describe(
         "Structured session context. Synthesize this from the conversation: one_liner, problem_statement, approach, " +
-          "tradeoffs, dead_ends, technologies, patterns_used, complexity_signals. Omit to fall back to git log/diff."
+          "tradeoffs, dead_ends, technologies, patterns_used, complexity_signals. Omit to fall back to git log/diff. " +
+          "Set story_id to update an existing living artifact (versioned in place) instead of adding a new one."
       ),
     output_dir: z.string().optional().describe("Override the configured output directory."),
     connector: z
@@ -110,6 +89,7 @@ const generateHandler = async ({ mode, session_summary, output_dir, connector, p
       const rawJson = session_summary
         ? JSON.stringify({
             session_id: session_summary.session_id ?? crypto.randomUUID(),
+            story_id: session_summary.story_id,
             timestamp: session_summary.timestamp ?? new Date().toISOString(),
             source_tool: session_summary.source_tool ?? "claude-code",
             summary: session_summary.summary,
@@ -117,21 +97,21 @@ const generateHandler = async ({ mode, session_summary, output_dir, connector, p
         : undefined;
 
       const session = await ingestSession(client, rawJson);
-      const writer = createConnector(config);
-
-      const modes: TranslationMode[] =
-        mode === "all" ? ["interview-qa", "portfolio-bullet", "technical-deep-dive"] : [mode];
+      const result = await generateArtifacts(client, config, session, resolveModes(mode), {
+        promptVersion: prompt_version,
+        focus,
+      });
 
       const returnOnly = config.connector === RETURN_ONLY;
-      const sections: string[] = [];
-      for (const m of modes) {
-        const output = await runTranslator(m, client, session, config, prompt_version, focus);
-        const location = await writer.write(output, session);
-        sections.push(
-          returnOnly
-            ? formatReturnOnly(output, session, location)
-            : `### ${m}\nWritten to: ${location}\n\n${output.content}`
-        );
+      const sections = result.artifacts.map(({ mode: m, output, location }) =>
+        returnOnly
+          ? formatReturnOnly(output, session, location)
+          : `### ${m}\nWritten to: ${location}` +
+            (output.artifact_version ? ` (v${output.artifact_version})` : "") +
+            `\n\n${output.content}`
+      );
+      if (result.story) {
+        sections.push(`Story: ${result.story.story_id} (v${result.story.version}, ${result.story.status})`);
       }
 
       return { content: [{ type: "text", text: sections.join("\n\n---\n\n") }] };

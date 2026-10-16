@@ -8,26 +8,11 @@ import { createSubagentRuntime } from "./subagent/factory.js";
 import { buildScoutTools } from "./subagent/tools/registry.js";
 import { ToolDef } from "./subagent/tools/types.js";
 import { promptVersionFromEnv } from "../config/paths.js";
+import { budgetTier } from "./budgets.js";
 
-// ── Budget table ───────────────────────────────────────────────────────────
-// Naive char-based token estimate (~4 chars/token). Kept in-house to avoid a
-// tokenizer dep; good enough for a soft cap. `max_session_chars` truncates
-// the session JSON we hand to the scout so a huge session cannot balloon the
-// subagent call past the effort tier. `max_output_tokens` / `max_tool_calls`
-// are hints the runtime enforces when it can (SDK-backed runtimes will;
-// InlineRuntime cannot).
-interface BudgetTier {
-  max_session_chars: number;
-  deadline_ms: number;
-  max_output_tokens: number;
-  max_tool_calls: number;
-  label: string;
-}
-
-const BUDGETS: Record<Exclude<FocusEffort, "off">, BudgetTier> = {
-  low:    { max_session_chars: 6_000,  deadline_ms: 15_000, max_output_tokens:  800, max_tool_calls: 0, label: "low" },
-  medium: { max_session_chars: 20_000, deadline_ms: 30_000, max_output_tokens: 2000, max_tool_calls: 3, label: "medium" },
-};
+// ── Budget ─────────────────────────────────────────────────────────────────
+// Focus effort maps 1:1 onto the named `low` / `medium` tiers in ./budgets.ts.
+// Other features pick their own tier explicitly (evidence, discovery).
 
 // ── Schema returned by the scout ──────────────────────────────────────────
 const CategoryWeightsSchema = z.object({
@@ -116,7 +101,7 @@ export async function runFocusScout(
   if (!focusText) return { brief: null, fallback_reason: "no-focus" };
   if (effort === "off") return { brief: null, fallback_reason: "effort-off" };
 
-  const budget = BUDGETS[effort];
+  const budget = budgetTier(effort);
   const deadline = deadlineMsOverride ?? budget.deadline_ms;
   const started = Date.now();
 

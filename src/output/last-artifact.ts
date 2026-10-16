@@ -1,42 +1,34 @@
-import { readFileSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 import { join } from "path";
-import { parse } from "yaml";
 import { resolveArtifactsDir } from "../config/paths.js";
+import { IndexEntry, indexPath, readIndex } from "./index-file.js";
 
 export interface LastArtifact {
   filename: string;
   filepath: string;
   markdown: string;
-  entry: {
-    session_id: string;
-    mode: string;
-    timestamp: string;
-    file: string;
-    one_liner: string;
-  };
+  entry: IndexEntry;
 }
 
 /**
  * Reads index.yml from the artifacts dir, returns the most recently written entry
  * along with its rendered markdown. Throws with a helpful message if no artifacts exist.
+ * Story upserts move their entry to the end of the index, so the tail is always
+ * the latest write.
  */
 export function readLastArtifact(outputDir?: string): LastArtifact {
   const resolved = resolveArtifactsDir(outputDir);
-  const indexPath = join(resolved, "index.yml");
+  const path = indexPath(resolved);
 
-  let indexRaw: string;
-  try {
-    indexRaw = readFileSync(indexPath, "utf-8");
-  } catch {
+  if (!existsSync(path)) {
     throw new Error(
-      `No artifacts index found at ${indexPath}. Run \`skill-forge generate\` first.`
+      `No artifacts index found at ${path}. Run \`skill-forge generate\` first.`
     );
   }
 
-  // index.yml is written as a flat sequence of `- session_id: ... ...` entries.
-  const entries = parse(indexRaw) as LastArtifact["entry"][] | null;
-  if (!entries || entries.length === 0) {
-    throw new Error(`Artifacts index at ${indexPath} is empty. Nothing to share.`);
+  const entries = readIndex(resolved);
+  if (entries.length === 0) {
+    throw new Error(`Artifacts index at ${path} is empty. Nothing to share.`);
   }
 
   const entry = entries[entries.length - 1];

@@ -24,6 +24,20 @@ function buildFrontmatter(output: TranslatorOutput, session: SessionSummary): st
     lines.push(`prompt_version: ${output.prompt_version}`);
   }
 
+  // v3 living-artifact fields — emitted only when present, so a story-less
+  // artifact renders exactly as it did in v2. JSON strings are valid YAML
+  // double-quoted scalars, which keeps user-supplied story ids safe.
+  if (session.story_id) {
+    lines.push(`story_id: ${JSON.stringify(session.story_id)}`);
+  }
+  if (output.artifact_version !== undefined) {
+    lines.push(`version: ${output.artifact_version}`);
+  }
+  const evidenceIds = (session.summary.evidence ?? []).map((e) => JSON.stringify(e.id));
+  if (evidenceIds.length > 0) {
+    lines.push(`evidence_ids: [${evidenceIds.join(", ")}]`);
+  }
+
   lines.push("---", "");
   return lines.join("\n");
 }

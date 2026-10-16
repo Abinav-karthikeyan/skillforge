@@ -1,4 +1,4 @@
-import { LLMClient, ProviderName } from "./types.js";
+import { ChatOptions, LLMClient, ProviderName } from "./types.js";
 import { AnthropicProvider } from "./providers/anthropic.js";
 import { OpenAICompatibleProvider } from "./providers/openai-compatible.js";
 import { DEFAULT_MODELS } from "./models.js";
@@ -57,7 +57,8 @@ function inferProviderFromEnv(): ProviderName {
 export async function callClaude(
   client: LLMClient,
   system: string,
-  user: string
+  user: string,
+  opts?: ChatOptions
 ): Promise<string> {
-  return client.chat(system, user);
+  return opts ? client.chat(system, user, opts) : client.chat(system, user);
 }
