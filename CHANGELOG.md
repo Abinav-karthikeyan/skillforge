@@ -8,6 +8,44 @@ back-compatible renames).
 
 Work toward the v3 roadmap in `plan_v3.md`, one phase at a time.
 
+### Phase 3.4 — OSS discovery: prior art and calibration
+- **Prior-art scout** (`src/discovery/`): deterministic retrieval from grep.app (`searchGitHub`),
+  GitHub repository search, and DeepWiki (`ask_wiki_question`). Tool and argument names were
+  confirmed with a live `tools/list` (DeepWiki's tool is `ask_wiki_question`, not the
+  `ask_question` the plan assumed) and are resolved by schema at runtime. Results are ranked
+  by topic and health (topic search first, then stars, recency, and license; archived,
+  forked, and unlicensed repos are never cited). Evidence is pinned to `repo@SHA` with its
+  license.
+- **Quarantine (dual-LLM pattern):** raw repository text is sanitized (hidden Unicode, HTML)
+  and seen only by a summarizer with no tools. Its ≤300-char paraphrase is validated: no
+  injection markers, no URLs, no 60-char run copied from the source, otherwise dropped.
+  Retrieval is deliberately not an LLM tool loop, so untrusted content can't steer what gets
+  fetched.
+- **Calibration scout:** a `SubagentSpec` on the `discovery` budget tier that sees only the
+  quarantined summaries. It returns standard / known-variant / unusual, canonical pattern
+  names, and a cited note.
+- **Modes:** `discovery: off | host | direct` (default off). Host mode adds the MCP tool
+  `plan_prior_art_search` (queries + evidence format for the host's own tools; no network
+  from skill-forge). Direct mode is enabled by `generate --prior-art` / MCP `prior_art: true`.
+  `skill-forge discover [--queries-only]` inspects queries and evidence without generating.
+- **Guardrails:** a hard endpoint allowlist (`mcp.grep.app`, `mcp.deepwiki.com`,
+  `api.github.com`), timeouts and byte caps, a 7-day cache, a persisted GitHub token bucket, a
+  per-story call cap, and the discovery deadline. Confidential repos send no queries in
+  either mode. Queries carry derived terms only (patterns, technologies, topic words),
+  never summary prose or paths.
+- **Artifacts:** translators get an evidence rule (cite every comparison inline; never
+  compare with systems that have no evidence entry). Inline ids render as numbered footnotes
+  with a Sources list of `repo @ sha · path · license — url`. The judge flags uncited
+  comparisons with named external systems and caps groundedness when it finds one.
+- `plan_ahead.md`'s "no skill-forge-as-MCP-client" rule is amended narrowly for allowlisted,
+  read-only, no-credential discovery endpoints (plan decision 1). GitHits stays host-mode
+  only, since its API is in beta and unpublished.
+- Exit criteria: on the 5-story fixture bank the scout returns ≥2 cited, licensed, SHA-pinned
+  comparisons per story (mocked providers), and the red-team fixture (a repository injecting
+  instructions) yields no injected text in evidence or artifacts. A live run against the
+  real endpoints, with a stub summarizer and no LLM spend, returned purpose-built
+  rate-limiter libraries for the rate-limiter story.
+
 ### Phase 3.3 — Cross-host observation
 - **Host adapters** (`src/observer/hosts/`): each adapter owns payload parsing (session, cwd,
   transcript, events) and its host's hook config. All of them translate into the shared

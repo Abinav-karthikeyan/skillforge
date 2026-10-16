@@ -2,7 +2,7 @@ import { LLMClient } from "../claude/types.js";
 import { callClaude } from "../claude/client.js";
 import { SessionSummary, TranslatorOutput } from "../types/session.js";
 import { CalibrationConfig } from "../types/config.js";
-import { loadPrompt, interpolate, applyCustomInstructions, applyCodeFactsRule } from "./base.js";
+import { loadPrompt, interpolate, applyCustomInstructions, applyCodeFactsRule, applyEvidenceRule } from "./base.js";
 
 export async function translateTechnicalDeepDive(
   client: LLMClient,
@@ -15,8 +15,8 @@ export async function translateTechnicalDeepDive(
     experience_level: config.experience_level,
     session_summary_json: JSON.stringify(session.summary, null, 2),
   });
-  const systemPrompt = applyCodeFactsRule(
-    applyCustomInstructions(basePrompt, config, "technical-deep-dive"),
+  const systemPrompt = applyEvidenceRule(
+    applyCodeFactsRule(applyCustomInstructions(basePrompt, config, "technical-deep-dive"), session),
     session
   );
 

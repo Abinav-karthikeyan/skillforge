@@ -138,6 +138,26 @@ const CODE_FACTS_RULE = [
   "---",
 ].join("\n");
 
+const EVIDENCE_RULE = [
+  "",
+  "---",
+  "Evidence rule — the summary's `evidence` lists prior art from open-source projects (paraphrased,",
+  "license-checked, pinned to a commit) and calibration notes:",
+  "  - You may compare the engineer's approach with these projects. Cite every comparison inline with",
+  "    the entry's id in square brackets, e.g. [pa-envoyproxy-envoy-1a2b3c4].",
+  "  - Never compare with a project, product, or system that has no evidence entry, and never quote",
+  "    external code or text.",
+  "  - Good uses: a follow-up such as \"Why not do it the way <project> does?\", or saying whether the",
+  "    approach is the standard one, using the calibration note's canonical names.",
+  "---",
+].join("\n");
+
+/** When a session carries prior-art / calibration evidence (v3 Pillar C), require cited comparisons. */
+export function applyEvidenceRule(systemPrompt: string, session: SessionSummary): string {
+  const has = (session.summary.evidence ?? []).some((e) => e.kind === "prior_art" || e.kind === "calibration");
+  return has ? systemPrompt + EVIDENCE_RULE : systemPrompt;
+}
+
 /**
  * When a session carries code facts (v3 Pillar A), constrain every metric in
  * the artifact to them. Sessions without code facts render exactly as before.

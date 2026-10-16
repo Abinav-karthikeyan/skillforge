@@ -8,6 +8,8 @@ import { translateTechnicalDeepDive } from "../translators/technical-deep-dive.j
 import { CalibrationConfig } from "../types/config.js";
 import { Story } from "../types/ledger.js";
 import { SessionSummary, TranslationMode, TranslatorOutput } from "../types/session.js";
+import { renderCitations } from "../discovery/citations.js";
+import { DiscoveryMode, DiscoveryResult, runDiscovery } from "../discovery/scouts.js";
 
 export const ALL_MODES: TranslationMode[] = ["interview-qa", "portfolio-bullet", "technical-deep-dive"];
 
@@ -46,6 +48,8 @@ export interface GenerateResult {
   /** The ledger story this run created or updated (undefined if the ledger write failed). */
   story?: Story;
   ledger_warning?: string;
+  /** Present when discovery ran (direct mode). */
+  discovery?: DiscoveryResult;
 }
 
 /**
@@ -60,12 +64,21 @@ export async function generateArtifacts(
   config: CalibrationConfig,
   session: SessionSummary,
   modes: TranslationMode[],
-  opts: { promptVersion?: string; focus?: string | string[] } = {}
+  opts: { promptVersion?: string; focus?: string | string[]; discovery?: DiscoveryMode } = {}
 ): Promise<GenerateResult> {
+  // Pillar C: enrich the story with cited prior art before translating (opt-in).
+  let discovery: DiscoveryResult | undefined;
+  const discoveryMode = opts.discovery ?? config.discovery ?? "off";
+  if (discoveryMode === "direct") {
+    discovery = await runDiscovery(session, config, { mode: "direct", client });
+    if (discovery.evidence.length) session.summary.evidence = [...(session.summary.evidence ?? []), ...discovery.evidence];
+  }
+
   const connector = createConnector(config);
   const artifacts: GeneratedArtifact[] = [];
   for (const mode of modes) {
     const output = await runTranslator(mode, client, session, config, opts.promptVersion, opts.focus);
+    output.content = renderCitations(output.content, session.summary.evidence ?? []);
     const location = await connector.write(output, session);
     artifacts.push({ mode, output, location });
   }
@@ -73,8 +86,8 @@ export async function generateArtifacts(
   try {
     const ledger = StoryLedger.forArtifactsDir(resolveArtifactsDir(config.output_dir));
     const story = ledger.recordGeneration(session, artifacts);
-    return { artifacts, story };
+    return { artifacts, story, discovery };
   } catch (err) {
-    return { artifacts, ledger_warning: `story ledger not updated: ${(err as Error).message}` };
+    return { artifacts, discovery, ledger_warning: `story ledger not updated: ${(err as Error).message}` };
   }
 }

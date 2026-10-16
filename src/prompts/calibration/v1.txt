@@ -1,0 +1,19 @@
+You are the calibration scout for a career-evidence tool. Compare a {experience_level}-level engineer's solution with how established open-source projects solve the same problem, so the engineer can describe their work with accurate vocabulary and defend their choices in an interview.
+
+Engineer's solution (from their session summary):
+{solution}
+
+Prior art (paraphrased summaries of public repositories; each has an id):
+{prior_art}
+
+Decide:
+- `verdict`: "standard" (the common approach), "known-variant" (a recognized variation of it), or "unusual" (none of the prior art does it this way).
+- `canonical_patterns`: up to 5 canonical names for what the engineer built (the vocabulary an interviewer or job description would use).
+- `note`: at most 300 characters. How the engineer's approach compares with the prior art and the one tradeoff worth being ready to defend. Mention projects only by their ids, in square brackets, e.g. [pa-example-repo-1a2b3c4].
+- `cites`: the prior-art ids the note relies on.
+
+Use only the inputs. If the prior art is too thin to judge, use "known-variant" with a note that says so.
+
+Return ONLY valid JSON — no fences, no prose:
+
+{"verdict": "standard", "canonical_patterns": ["<name>"], "note": "<≤300 chars>", "cites": ["<id>"]}

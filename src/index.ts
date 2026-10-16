@@ -39,6 +39,8 @@ import type { HostAdapter } from "./observer/hosts/types.js";
 import { importEntireCheckpoints } from "./observer/importers/entire.js";
 import { agentTraceStorePath, readAgentTraces, storeAgentTraces } from "./codeintel/attribution.js";
 import { homedir } from "os";
+import { runDiscovery } from "./discovery/scouts.js";
+import { buildDiscoveryQueries } from "./discovery/queries.js";
 import {
   buildRepoGraph,
   buildStructuralDigest,
@@ -102,6 +104,7 @@ program
   .option("-s, --story <id>", "Story id: update this living artifact in place (versioned) instead of adding a new one")
   .option("-r, --range <range>", "Git range for the git path (e.g. main..HEAD, HEAD~3..HEAD). Default: HEAD~1..HEAD")
   .option("--with-code-facts", "With --json: also attach deterministic code facts computed from git for --range")
+  .option("--prior-art", "Discovery (direct): cite how open-source projects solve the same problem (grep.app, DeepWiki, GitHub)")
   .option("-f, --focus <text...>", "Focus lens for interview-qa mode (repeatable). Triggers the focus-scout subagent pass.")
   .option("--focus-effort <level>", "Focus subagent budget: low | medium | off (default: low, or config.focus_effort)")
   .option("--focus-deadline-ms <ms>", "Wall-clock deadline for the focus subagent call before graceful fallback")
@@ -141,7 +144,16 @@ program
 
       const result = await generateArtifacts(client, config, session, modes, {
         promptVersion: opts.promptVersion,
+        discovery: opts.priorArt ? "direct" : undefined,
       });
+      if (result.discovery) {
+        const d = result.discovery;
+        console.log(
+          d.skipped
+            ? `[discovery] skipped: ${d.skipped}`
+            : `[discovery] ${d.evidence.filter((e) => e.kind === "prior_art").length} prior-art source(s)${d.evidence.some((e) => e.kind === "calibration") ? " + calibration" : ""}`
+        );
+      }
       for (const { mode, output, location } of result.artifacts) {
         if (config.connector === RETURN_ONLY) {
           console.log(formatReturnOnly(output, session, location));
@@ -731,6 +743,29 @@ program
       const sessions = opts.session ? [opts.session] : sessionsForRepo(journal, opts.repo);
       const r = forgetSessions(sessions, journal, ledger);
       console.log(`✓ Forgot ${r.sessions.length} session(s) and ${r.stories.length} observer stor${r.stories.length === 1 ? "y" : "ies"}.`);
+    } catch (err) {
+      fail(err);
+    }
+  });
+
+// ── discovery ──────────────────────────────────────────────────────────────
+program
+  .command("discover")
+  .description("Find and cite prior art for a session summary (direct mode: grep.app, DeepWiki, GitHub) without generating")
+  .requiredOption("-j, --json <path>", "SessionSummary JSON")
+  .option("--queries-only", "Print the derived queries and stop (no network)")
+  .action(async (opts) => {
+    try {
+      const config = loadCalibration();
+      const session = SessionSummarySchema.parse(JSON.parse(readFileSync(opts.json, "utf-8")));
+      if (opts.queriesOnly) {
+        console.log(JSON.stringify(buildDiscoveryQueries(session), null, 2));
+        return;
+      }
+      const result = await runDiscovery(session, config, { mode: "direct", client: clientFor(config) });
+      if (result.skipped) console.log(`skipped: ${result.skipped}`);
+      for (const n of result.notes) console.log(`- ${n}`);
+      console.log(JSON.stringify(result.evidence, null, 2));
     } catch (err) {
       fail(err);
     }

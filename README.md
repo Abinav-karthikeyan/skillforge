@@ -380,6 +380,28 @@ How it works (plan_v3 §3):
 
 ---
 
+## Prior art & calibration (opt-in discovery)
+
+An interviewer will ask why you didn't do it the way Envoy does. With discovery on, a story carries **cited prior art**: 2–4 mature open-source projects that solve the same problem, each pinned to a commit with its license. It also gets a **calibration note**: is your approach standard, a known variant, or unusual, and what is it canonically called? Artifacts cite these inline (`[1]`) and end with a Sources list; the judge fails comparisons with named external systems that cite nothing.
+
+```bash
+skill-forge generate --mode interview-qa --json s.json --prior-art   # direct mode, this run
+skill-forge discover --json s.json --queries-only                     # see exactly what would be searched (no network)
+```
+
+```yaml
+discovery: host        # off (default) | host | direct
+github_token: ${GITHUB_TOKEN}   # optional: higher GitHub rate limits in direct mode
+```
+
+- **host** mode (recommended when your agent has the tools): skill-forge makes no network calls. The MCP tool `plan_prior_art_search` hands the host agent the queries and the evidence format, and the agent runs them with the grep.app, DeepWiki, GitHits, or Sourcegraph tools it already has, passing the results back as `session_summary.summary.evidence`.
+- **direct** mode: skill-forge queries [grep.app](https://grep.app) and [DeepWiki](https://deepwiki.com) over their public MCP servers, plus the GitHub REST API for license, stars, and a pinned SHA. These three endpoints sit on a hard allowlist; nothing else is reachable.
+- **Untrusted content is quarantined.** Repository text is an instruction channel, so it only ever reaches a summarizer with no tools. That summarizer returns ≤300-character paraphrases, and those are dropped if they carry injection markers, URLs, or text copied from the source. The calibration scout (a `SubagentSpec` on the `discovery` budget tier) sees only those summaries. A red-team fixture asserts injected text never reaches evidence or artifacts.
+- **License and attribution:** only repositories with a known license are cited. External code is never pasted; everything is paraphrased and linked at a SHA, with the license recorded.
+- Results are cached for 7 days (`~/.skill-forge/cache/discovery`). GitHub calls go through a token bucket that respects its rate limits. **Confidential repositories never send a discovery query** in either mode.
+
+---
+
 ## Code intelligence (optional companion)
 
 Every git-path run computes **code facts**: deterministic, LLM-free measurements of the change that the translators must take every number from. Without anything extra you get git-level facts (**L0**: files, lines, symbols named in hunk headers, a feature/refactor/fix/test/config/docs classification). Install the companion for structural facts (**L1**):

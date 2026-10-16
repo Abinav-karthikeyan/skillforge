@@ -179,6 +179,12 @@ integration surface per target with none of the upside. Host-delivery is the def
 hand-written connectors survive only where the host demonstrably can't deliver
 (see table).
 
+> **Amended in v3 (plan_v3.md §10, decision 1):** a narrow exception for *discovery*
+> only. Host mode stays the default. Direct mode may talk to public, read-only,
+> no-credential MCP endpoints (grep.app, DeepWiki) and the GitHub REST API (with an
+> optional user token), behind a hard endpoint allowlist. It holds no other server's
+> credentials and never launches local MCP servers. See `src/discovery/`.
+
 ### Bet 3 — Grow the scout into an evidence engine (unifies input-side ecosystems)
 
 **What:** The scout in `src/orchestrator/` already reads the repo under budget. Widen its
@@ -260,7 +266,7 @@ Half of "use-needing features rather than reinventing the wheel" is naming the w
   Google, use host-delivery. Building our own auth for those re-implements what the
   ecosystem solved.
 - **No skill-forge-as-MCP-client** holding other servers' credentials and sessions (see
-  Bet 2 rationale).
+  Bet 2 rationale; v3 allows only allowlisted, read-only, no-credential discovery endpoints).
 - **No new "mode" for every artifact shape.** interview-qa / portfolio-bullet /
   technical-deep-dive cover the space; JD-tailoring and digest are *lenses/schedules* over
   them, not new translators.

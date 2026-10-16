@@ -6,7 +6,7 @@ import {
 } from "../types/config.js";
 import { projectConfigPath, configYamlPath } from "./paths.js";
 
-const SECRET_FIELDS = ["api_key", "gist_token", "notion_token", "notion_database_id"];
+const SECRET_FIELDS = ["api_key", "gist_token", "notion_token", "notion_database_id", "github_token"];
 
 function resolveEnvRef(value: string, fieldName: string): string {
   const match = /^\$\{(\w+)\}$/.exec(value);

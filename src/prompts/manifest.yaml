@@ -56,6 +56,20 @@ reflector:
       notes: "Cold-path reflector (v3 Pillar B): a session's observations + code facts → story title and SessionSummary content"
       tuned_against: "deepseek-chat"
 
+quarantine:
+  active: v1
+  versions:
+    v1:
+      notes: "Quarantined summarizer (v3 Pillar C): untrusted repository text → ≤300-char paraphrase, patterns, relevance. No tools; output validated."
+      tuned_against: "deepseek-chat"
+
+calibration:
+  active: v1
+  versions:
+    v1:
+      notes: "Calibration scout (v3 Pillar C): session solution vs quarantined prior-art summaries → verdict, canonical patterns, cited note"
+      tuned_against: "deepseek-chat"
+
 judge:
   active: v1
   versions:

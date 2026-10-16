@@ -48,6 +48,41 @@ export interface JudgeScores {
   calibration_fit: number;
 }
 
+export interface ComparisonReport {
+  /** Sentences comparing the work with an external, named system. */
+  external: number;
+  /** Those without an evidence citation ([n] or [pa-…]). */
+  uncited: string[];
+}
+
+const COMPARATIVE =
+  /\b(unlike|similar(ly)? to|compared (to|with)|in contrast (to|with)|whereas|the way [A-Z][\w.-]+|like [A-Z][\w.-]+ (does|did)|as [A-Z][\w.-]+ does|same approach as|differs? from|instead of how)\b/i;
+const CITED = /\[\d+\]|\[(pa|cal)-[a-z0-9-]+\]/;
+const NOT_NAMES = new Set(["The", "This", "That", "These", "Those", "Our", "Their", "When", "While", "Instead", "Unlike", "Like", "Compared", "Whereas", "Situation", "Task", "Action", "Result", "Answer", "Calibration", "Sources", "Follow-ups"]);
+
+/**
+ * Deterministic check (plan_v3 §4.5): a comparison with a named external
+ * system must cite an evidence entry. "External" = a capitalized name in a
+ * comparative sentence that the session summary itself never mentions.
+ */
+export function checkComparisons(body: string, session: SessionSummary): ComparisonReport {
+  const { evidence: _evidence, ...own } = session.summary;
+  const ground = JSON.stringify(own).toLowerCase();
+  const sentences = body.split(/(?<=[.!?])\s+|\n+/).map((s) => s.trim()).filter(Boolean);
+  let external = 0;
+  const uncited: string[] = [];
+  for (const sentence of sentences) {
+    if (!COMPARATIVE.test(sentence)) continue;
+    const names = [...sentence.matchAll(/(?<![\w.])[A-Z][A-Za-z0-9.-]{2,}\b/g)]
+      .map((m) => m[0].replace(/[.-]+$/, ""))
+      .filter((n) => !NOT_NAMES.has(n) && !ground.includes(n.toLowerCase()));
+    if (names.length === 0) continue;
+    external++;
+    if (!CITED.test(sentence)) uncited.push(sentence.slice(0, 200));
+  }
+  return { external, uncited };
+}
+
 export interface JudgeResult {
   mode: TranslationMode;
   prompt_version: string;
@@ -57,6 +92,7 @@ export interface JudgeResult {
   rationales: Partial<Record<JudgeDimension, string>>;
   unsupported_claims: string[];
   metric_honesty: MetricHonestyReport;
+  comparisons: ComparisonReport;
 }
 
 export interface JudgeInput {
@@ -136,10 +172,12 @@ export async function judgeArtifact(client: LLMClient, input: JudgeInput): Promi
   const metric = checkMetricHonesty(body, input.session, input.extraGround);
   const star = input.mode === "interview-qa" ? judged.star_completeness?.score ?? null : null;
 
+  const comparisons = checkComparisons(body, input.session);
   const scores: JudgeScores = {
     star_completeness: star,
     specificity: judged.specificity.score,
-    groundedness: judged.groundedness.score,
+    // An uncited comparison with an external system caps groundedness.
+    groundedness: comparisons.uncited.length ? Math.min(judged.groundedness.score, 3) : judged.groundedness.score,
     metric_honesty: metric.score,
     calibration_fit: judged.calibration_fit.score,
   };
@@ -163,8 +201,9 @@ export async function judgeArtifact(client: LLMClient, input: JudgeInput): Promi
     scores,
     overall: round2(present.reduce((a, b) => a + b, 0) / present.length),
     rationales,
-    unsupported_claims: judged.groundedness.unsupported_claims,
+    unsupported_claims: [...judged.groundedness.unsupported_claims, ...comparisons.uncited.map((s) => `uncited comparison: ${s}`)],
     metric_honesty: metric,
+    comparisons,
   };
 }
 

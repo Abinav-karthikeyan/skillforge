@@ -57,6 +57,13 @@ export interface CalibrationConfig {
   // Confidential repos always use a local Ollama model (`observer_local_model`).
   observer_model?: string;
   observer_local_model?: string;
+  // OSS discovery (v3 Pillar C). "off" (default) | "host": the host agent
+  // supplies prior-art evidence from its own MCP servers | "direct": skill-forge
+  // queries grep.app, DeepWiki, and GitHub itself (public, read-only).
+  // Confidential repos never send discovery queries.
+  discovery?: "off" | "host" | "direct";
+  // Optional GitHub token for discovery (higher rate limits). Falls back to GITHUB_TOKEN.
+  github_token?: string;
 }
 
 export type FocusEffort = "low" | "medium" | "off";
