@@ -1,14 +1,15 @@
 import { execSync } from "child_process";
+import { buildStructuralDigest, isGitRepo, renderDigest, StructuralDigest } from "../codeintel/index.js";
 
 export interface RawContext {
   git_log: string;
   git_diff: string;
 }
 
-export function gatherGitContext(): RawContext {
+export function gatherGitContext(root?: string): RawContext {
   const run = (cmd: string): string => {
     try {
-      return execSync(cmd, { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] });
+      return execSync(cmd, { cwd: root, encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] });
     } catch {
       return "";
     }
@@ -30,4 +31,28 @@ export function gatherGitContext(): RawContext {
   }
 
   return { git_log, git_diff };
+}
+
+export interface StructuralContext {
+  digest: StructuralDigest;
+  /** Compact, complete rendering for the ingest prompt. */
+  rendered: string;
+}
+
+/**
+ * The v3 git context: a structural digest of the range (entity-level with the
+ * codeintel companion, file-level without). Resolves null outside a git repo
+ * or if git fails, so callers can fall back to the v2 raw diff.
+ */
+export async function gatherStructuralContext(
+  opts: { root?: string; range?: string } = {}
+): Promise<StructuralContext | null> {
+  const root = opts.root ?? process.cwd();
+  if (!isGitRepo(root)) return null;
+  try {
+    const digest = await buildStructuralDigest({ root, range: opts.range });
+    return { digest, rendered: renderDigest(digest) };
+  } catch {
+    return null;
+  }
 }

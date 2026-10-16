@@ -333,6 +333,30 @@ The instructions appear as a clearly delimited block at the end of the system pr
 
 ---
 
+## Code intelligence (optional companion)
+
+Every git-path run computes **code facts**: deterministic, LLM-free measurements of the change that the translators must take every number from. Without anything extra you get git-level facts (**L0**: files, lines, symbols named in hunk headers, a feature/refactor/fix/test/config/docs classification). Install the companion for structural facts (**L1**):
+
+```bash
+npm i -g @abhinavravich1999/skill-forge-codeintel
+skill-forge codeintel status        # ✓ L1 (tree-sitter) — typescript, tsx, javascript, python, go, java, rust, csharp
+```
+
+With L1 the ingestor sends a **structural digest** instead of a truncated raw diff: every changed file, each function/class/type that was added, modified, renamed, moved, or removed, cyclomatic complexity before → after, public API changes, tests that reference the changed symbols, an approximate blast radius, and a fingerprint (languages, frameworks, new dependencies). Generated and vendored files (`.gitattributes` `linguist-generated` / `linguist-vendored`) and lockfiles never count toward metrics.
+
+```bash
+skill-forge codeintel digest main..HEAD     # what the ingestor sends (add --json for the raw facts)
+skill-forge codeintel map --budget 800      # ranked repo map (personalized PageRank over references)
+skill-forge generate --range main..HEAD     # generate from a multi-commit range
+skill-forge generate --json s.json --with-code-facts   # attach facts to a hand-synthesized summary
+```
+
+The companion is web-tree-sitter (WASM, so nothing to compile on any OS) plus vendored, checksummed grammars; nothing is downloaded at runtime. References are name-based at L1, so blast-radius counts render as "~N". For precise counts, a host agent with an LSP tool can supply them (L2; see [skills/skill-forge/SKILL.md](skills/skill-forge/SKILL.md)). `SKILL_FORGE_CODEINTEL=off` forces L0. The scout also gets six code-intelligence tools: `outline`, `find_symbol`, `references`, `structural_diff`, `metrics`, and `repo_map`.
+
+`npx tsx scripts/ingest-compare.ts --commits 20` compares v2 and v3 ingest prompt sizes on your own history. On this repo's last 12 commits v3 used 45% of v2's tokens. v2 truncated 6 of those commits; v3 truncated none.
+
+---
+
 ## Prompt eval
 
 Compare prompt versions across all fixtures to catch regressions before promoting a new version:
@@ -479,6 +503,7 @@ src/
   types/          # Zod schemas — SessionSummary, TranslatorOutput, CalibrationConfig, ledger (Event/Observation/Story), Evidence
   claude/         # LLM client — provider factory + Anthropic / OpenAI-compatible providers (chat + native tool loops)
   pipeline/       # generate.ts — shared translate → write → record-story pipeline (CLI, MCP, hook)
+  codeintel/      # Code facts: structural digest, entity diff, complexity, repo map, fingerprint (L0 git / L1 tree-sitter)
   ledger/         # Story ledger (stories, observations, evidence) + legacy index.yml migration
   eval/           # Judge rubric + deterministic metric-honesty check
   hooks/          # Host hook entry points (post-commit)
@@ -493,6 +518,9 @@ src/
   auth/           # Connector auth flows — notion.ts (interactive), config-writer.ts (env/.yaml merge)
   mcp/            # server.ts — MCP server: generate, list, share, notion_auth_status tools
   index.ts        # CLI entry point — generate, list, share, auth subcommands
+
+packages/
+  codeintel/      # @abhinavravich1999/skill-forge-codeintel — optional companion: web-tree-sitter + vendored grammars
 
 claude-code-integration/
   commands/       # skill-forge.md — install as a Claude Code slash command

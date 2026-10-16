@@ -60,10 +60,20 @@ jobs:
       # by name — the same path a user gets from `npm i -g @…/skill-forge`.
       # `shell: bash` runs on both Ubuntu and Windows runners so one script covers
       # the matrix; the global npm prefix is already on PATH via setup-node.
-      - name: Pack, global-install, and smoke the binaries
+      - name: Pack, global-install, and smoke the binaries (core only → L0)
         shell: bash
         run: |
           TARBALL=$(npm pack | tail -1)
           echo "packed: $TARBALL"
           npm i -g "./$TARBALL"
-          node scripts/pack-smoke.mjs
+          SF_EXPECT_CODEINTEL=L0 node scripts/pack-smoke.mjs
+
+      # Same smoke with the optional code-intelligence companion installed
+      # beside the core — the path `npm i -g skill-forge skill-forge-codeintel`.
+      - name: Add the codeintel companion and smoke again (→ L1)
+        shell: bash
+        run: |
+          COMPANION=$(npm pack -w packages/codeintel | tail -1)
+          echo "packed: $COMPANION"
+          npm i -g "./$COMPANION"
+          SF_EXPECT_CODEINTEL=L1 node scripts/pack-smoke.mjs

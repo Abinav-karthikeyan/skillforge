@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CodeFactsSchema } from "./code-facts.js";
 import {
   SessionSummary,
   SessionSummaryContentSchema,
@@ -94,8 +95,8 @@ export const StorySchema = z.object({
   // The distilled content the story projects into a SessionSummary. Absent
   // for stories migrated from a legacy index.yml (only the one_liner survives).
   summary: SessionSummaryContentSchema.optional(),
-  // Deterministic code facts (Pillar A). Typed in src/codeintel once it lands.
-  code_facts: z.unknown().optional(),
+  // Deterministic code facts (Pillar A) for the story as a whole.
+  code_facts: CodeFactsSchema.optional(),
   artifacts: z.array(StoryArtifactSchema).default([]),
 });
 

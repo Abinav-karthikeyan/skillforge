@@ -51,6 +51,16 @@ const list = runCli(["list", "--output-dir", emptyDir], "skill-forge list");
 if (!/No artifacts found/.test(list)) fail(`list did not report an empty artifacts dir:\n${list}`);
 console.log("✓ skill-forge list (empty dir)");
 
+// ── 2b. code-intelligence layer (with / without the optional companion) ─────
+// SF_EXPECT_CODEINTEL=L0 → core installed alone; L1 → companion installed too.
+const expectLayer = process.env.SF_EXPECT_CODEINTEL;
+const status = runCli(["codeintel", "status"], "skill-forge codeintel status");
+const layer = /^✓ L1\b/m.test(status) ? "L1" : /^L0\b/m.test(status) ? "L0" : null;
+if (!layer) fail(`codeintel status printed no layer:\n${status}`);
+if (expectLayer && layer !== expectLayer) fail(`expected code intelligence ${expectLayer}, got ${layer}:\n${status}`);
+if (layer === "L1" && !/typescript/.test(status)) fail(`L1 active but grammars missing:\n${status}`);
+console.log(`✓ skill-forge codeintel status (${layer})`);
+
 // ── 3. MCP tools/list handshake ─────────────────────────────────────────────
 const REQUIRED_TOOL = "generate_skill_forge_artifact";
 const mcpTimeoutMs = 15_000;

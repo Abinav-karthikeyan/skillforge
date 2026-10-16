@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { EvidenceSchema } from "./evidence.js";
+import { CodeFactsSchema } from "./code-facts.js";
 
 export const TradeoffSchema = z.object({
   decision: z.string(),
@@ -23,6 +24,9 @@ export const SessionSummaryContentSchema = z.object({
   technologies: z.array(z.string()).optional().default([]),
   patterns_used: z.array(z.string()).optional().default([]),
   complexity_signals: ComplexitySignalsSchema.optional(),
+  // Deterministic code facts (v3 Pillar A) — the only allowed source of
+  // numbers in artifacts when present. See src/types/code-facts.ts.
+  code_facts: CodeFactsSchema.optional(),
   // Provenance the translators may cite (v3). No default, so a v1 summary
   // serializes into prompts byte-for-byte as before.
   evidence: z.array(EvidenceSchema).optional(),

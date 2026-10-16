@@ -7,6 +7,8 @@ vi.mock("../src/adapters/claude-code.js", () => ({
     git_log: "abc123 feat: add redis rate limiter\n",
     git_diff: "diff --git a/src/index.ts b/src/index.ts\n+export const limit = 100;\n",
   }),
+  // v2 path: no structural digest. The digest path is covered in tests/codeintel/.
+  gatherStructuralContext: async () => null,
 }));
 
 function mockClient(returnValue: string): LLMClient {

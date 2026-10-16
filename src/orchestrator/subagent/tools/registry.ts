@@ -3,17 +3,14 @@ import { join, resolve, relative, sep } from "path";
 import { execFileSync } from "child_process";
 import { z } from "zod";
 import { ToolDef } from "./types.js";
+import { IGNORED_DIRS } from "../../../codeintel/paths.js";
+import { buildCodeIntelTools } from "./codeintel-tools.js";
 
 // ── Sandbox / safety caps ─────────────────────────────────────────────────
 // The scout runs in-process, so tool inputs come from an LLM. Every path is
 // resolved against `root` and rejected if it escapes; results are capped so
 // a runaway grep can't blow up context. These caps intentionally err small —
 // the scout only needs corroborating signal, not exhaustive listings.
-
-const IGNORED_DIRS = new Set([
-  "node_modules", ".git", "dist", "build", ".next", ".cache",
-  "coverage", ".turbo", ".venv", "__pycache__",
-]);
 
 const MAX_WALK_FILES = 5_000;      // hard ceiling on files enumerated per call
 const MAX_GREP_MATCHES = 50;
@@ -202,10 +199,11 @@ function makeGitLog(root: string): ToolDef {
 }
 
 /**
- * Build the full tool set the scout can be granted. The caller (conductor)
- * decides which subset to hand to the runtime based on the effort tier —
- * `max_tool_calls` bounds usage; passing an empty tool array disables the
- * tool loop entirely.
+ * Build the full tool set the scout can be granted: the four lexical repo
+ * tools plus the six code-intelligence tools (./codeintel-tools.ts). The
+ * caller (conductor) decides which subset to hand to the runtime based on the
+ * budget tier — `max_tool_calls` bounds usage; passing an empty tool array
+ * disables the tool loop entirely.
  */
 export function buildScoutTools(root: string = process.cwd()): ToolDef[] {
   return [
@@ -213,5 +211,6 @@ export function buildScoutTools(root: string = process.cwd()): ToolDef[] {
     makeReadFile(root),
     makeListFiles(root),
     makeGitLog(root),
+    ...buildCodeIntelTools(root),
   ];
 }

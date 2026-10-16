@@ -1,0 +1,44 @@
+{
+  "name": "@abhinavravich1999/skill-forge-codeintel",
+  "version": "0.1.0",
+  "description": "Optional code-intelligence companion for skill-forge: web-tree-sitter runtime plus vendored grammars (TS/TSX, JS, Python, Go, Java, Rust, C#)",
+  "type": "module",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    }
+  },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "grammars/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "vendor-grammars": "node scripts/vendor-grammars.mjs",
+    "check-grammars": "node scripts/vendor-grammars.mjs --check",
+    "prepack": "node scripts/vendor-grammars.mjs --check"
+  },
+  "keywords": [
+    "skill-forge",
+    "tree-sitter",
+    "code-intelligence"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Abinav-karthikeyan/skillforge.git",
+    "directory": "packages/codeintel"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "author": "Abinav Karthikeyan",
+  "license": "MIT",
+  "dependencies": {
+    "web-tree-sitter": "0.26.13"
+  }
+}

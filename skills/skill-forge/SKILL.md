@@ -95,9 +95,36 @@ Common flags:
 - `--output-dir <dir>` — where to write (default: `~/.skill-forge/artifacts/`).
 - `--connector <local | gist | notion | return_only>` — where it goes (see Step 4).
 - `--focus "<lens>" --focus-effort <low|medium|off>` — interview-qa only (see below).
+- `--with-code-facts [--range <git range>]` — attach deterministic code facts (see below).
+- `--story <id>` — regenerate a living artifact in place (versioned) instead of adding a new one.
 
 Then tell the user what was produced and where. `skill-forge list` shows the
 artifact index.
+
+## Code facts: let measured numbers replace estimates
+
+When the session's work is committed, add `--with-code-facts` (MCP:
+`with_code_facts: true`, plus `range` if the work spans several commits, e.g.
+`main..HEAD`). skill-forge then computes facts from git: files and lines changed;
+with the optional `@abhinavravich1999/skill-forge-codeintel` companion, also which
+functions/classes were added, modified, renamed, or moved, cyclomatic complexity
+before → after, public API changes, linked tests, and an approximate blast radius.
+Artifacts may then **only** state numbers that appear in those facts, so a bullet
+like "cut `parseToken`'s complexity from 14 to 6" is a fact, not a guess.
+`skill-forge codeintel status` shows which layer is active, and
+`skill-forge codeintel digest main..HEAD` prints what was measured.
+
+Don't put numbers in `complexity_signals` yourself when code facts are attached;
+they are overwritten with measured values.
+
+**If you have an LSP / code-navigation tool** (e.g. Claude Code's LSP
+`findReferences`, a Serena or Sourcegraph MCP), you can upgrade the blast radius
+from approximate to precise. For the most important changed public symbols
+(`code_facts.blast_radius`), count the referencing files with that tool and put the
+result in the summary's `code_facts.blast_radius` entries with
+`approximate: false`, and set `code_facts.layer` to `"L2"` and `code_facts.source`
+to `"lsp"`. Only do this with real tool results; never mark a guessed count as
+precise.
 
 ## Choosing a mode
 

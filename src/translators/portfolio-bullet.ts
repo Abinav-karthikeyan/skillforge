@@ -2,7 +2,7 @@ import { LLMClient } from "../claude/types.js";
 import { callClaude } from "../claude/client.js";
 import { SessionSummary, TranslatorOutput } from "../types/session.js";
 import { CalibrationConfig } from "../types/config.js";
-import { loadPrompt, interpolate, applyCustomInstructions } from "./base.js";
+import { loadPrompt, interpolate, applyCustomInstructions, applyCodeFactsRule } from "./base.js";
 
 export async function translatePortfolioBullet(
   client: LLMClient,
@@ -15,7 +15,10 @@ export async function translatePortfolioBullet(
     experience_level: config.experience_level,
     session_summary_json: JSON.stringify(session.summary, null, 2),
   });
-  const systemPrompt = applyCustomInstructions(basePrompt, config, "portfolio-bullet");
+  const systemPrompt = applyCodeFactsRule(
+    applyCustomInstructions(basePrompt, config, "portfolio-bullet"),
+    session
+  );
 
   const content = await callClaude(client, systemPrompt, "Generate the portfolio bullets.");
 

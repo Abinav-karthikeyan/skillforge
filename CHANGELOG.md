@@ -8,6 +8,38 @@ back-compatible renames).
 
 Work toward the v3 roadmap in `plan_v3.md`, one phase at a time.
 
+### Phase 3.1 — Code intelligence
+- **`src/codeintel/`**: entity-level structural diff (added / modified / renamed / moved /
+  removed, with rename detection by masked body hash and token similarity, and
+  cross-file moves), per-function cyclomatic complexity, public API changes, name-based
+  test linkage and blast radius, change classification (feature / refactor / fix / test /
+  config / docs, with reasons), fingerprint (languages, frameworks, added dependencies,
+  pattern hints), and an Aider-style repo map (personalized PageRank within a token
+  budget). Honors `.gitattributes` `linguist-generated` / `linguist-vendored`; lockfiles
+  and build output never count toward metrics.
+- **Optional companion `@abhinavravich1999/skill-forge-codeintel`** (`packages/codeintel`,
+  an npm workspace): web-tree-sitter 0.26.13 plus vendored grammars for TypeScript, TSX,
+  JavaScript, Python, Go, Java, Rust and C#, pinned and checksummed in
+  `grammars/MANIFEST.json`. Core auto-detects it (L1) and degrades to git-only facts (L0)
+  without it, so the base install stays light. `SKILL_FORGE_CODEINTEL=off` forces L0.
+- **Structural digest in the ingestor.** The git and hook paths send a complete digest
+  instead of the first 15 KB of the raw diff, plus the raw diff only when it is small
+  (or as a bounded excerpt when there are no code entities to show). On this repo's last
+  12 commits that is 45% of v2's prompt tokens, with no truncation (v2 truncated 6).
+  `scripts/ingest-compare.ts` reproduces the comparison on any repo.
+- **`code_facts`** in `SessionSummary` (layer, source, approximate flags). The ingestor
+  overwrites the LLM's size estimates with measured values, and translators get a rule
+  that metrics may only come from `code_facts` ("~N" for approximate counts). The judge's
+  metric-honesty check treats code facts as ground truth.
+- **Six scout tools:** `outline`, `find_symbol`, `references` (always `approximate: true`),
+  `structural_diff`, `metrics`, `repo_map`, sandboxed and size-capped like the v2 tools,
+  with lexical fallbacks at L0.
+- CLI: `skill-forge codeintel status|digest|map`, `generate --range`,
+  `generate --with-code-facts`; MCP: `range` and `with_code_facts` on the generate tool.
+  SKILL.md tells hosts with an LSP tool how to supply precise (L2) reference counts.
+- pack-smoke checks the code-intelligence layer, and CI smokes both the core alone (L0)
+  and core + companion (L1) on Ubuntu and Windows.
+
 ### Phase 3.0 — Foundations
 - **Judge (v2 Bet 6).** `skill-forge judge <artifact> --json <summary.json>` (or
   `--story <id>`) scores an artifact on STAR completeness, specificity, groundedness,

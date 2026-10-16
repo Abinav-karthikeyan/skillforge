@@ -21,6 +21,17 @@ import { loadAllStories, migrateIndexToLedger } from "./ledger/migrate.js";
 import { projectStory, StoryStatus } from "./types/ledger.js";
 import { formatJudgeTable, judgeArtifact, JudgeResult, modeFromFrontmatter } from "./eval/judge.js";
 import { hookLog, runPostCommitHook } from "./hooks/post-commit.js";
+import {
+  buildRepoGraph,
+  buildStructuralDigest,
+  CODEINTEL_PACKAGE,
+  codeIntelStatus,
+  EntityExtractor,
+  loadCodeIntelRuntime,
+  rankFiles,
+  renderDigest,
+  renderRepoMap,
+} from "./codeintel/index.js";
 
 const program = new Command();
 
@@ -71,6 +82,8 @@ program
   .option("-c, --connector <name>", `Connector: ${listConnectors().join(" | ")} (overrides config)`)
   .option("-p, --prompt-version <version>", "Prompt version to use (e.g. v2). Falls back to manifest active version.")
   .option("-s, --story <id>", "Story id: update this living artifact in place (versioned) instead of adding a new one")
+  .option("-r, --range <range>", "Git range for the git path (e.g. main..HEAD, HEAD~3..HEAD). Default: HEAD~1..HEAD")
+  .option("--with-code-facts", "With --json: also attach deterministic code facts computed from git for --range")
   .option("-f, --focus <text...>", "Focus lens for interview-qa mode (repeatable). Triggers the focus-scout subagent pass.")
   .option("--focus-effort <level>", "Focus subagent budget: low | medium | off (default: low, or config.focus_effort)")
   .option("--focus-deadline-ms <ms>", "Wall-clock deadline for the focus subagent call before graceful fallback")
@@ -102,7 +115,10 @@ program
       }
 
       const modes = resolveModes(opts.mode);
-      const session = await ingestSession(client, rawJson);
+      const session = await ingestSession(client, rawJson, {
+        range: opts.range,
+        withCodeFacts: Boolean(opts.withCodeFacts),
+      });
       if (opts.story) session.story_id = opts.story;
 
       const result = await generateArtifacts(client, config, session, modes, {
@@ -339,6 +355,55 @@ for (const [name, status] of [
       }
     });
 }
+
+// ── codeintel ──────────────────────────────────────────────────────────────
+const codeintelCmd = program
+  .command("codeintel")
+  .description("Deterministic code facts: structural diff, complexity, repo map (L1 needs the codeintel companion)");
+
+codeintelCmd
+  .command("status")
+  .description("Show which code-intelligence layer is active and which grammars are available")
+  .action(async () => {
+    const status = await codeIntelStatus();
+    if (status.layer === "L1") {
+      console.log(`✓ L1 (tree-sitter) — ${status.package}@${status.version}`);
+      console.log(`  grammars: ${status.grammars.join(", ")}`);
+    } else {
+      console.log(`L0 (git only) — ${status.reason}`);
+      console.log(`  For structural facts: npm i -g ${CODEINTEL_PACKAGE}`);
+    }
+  });
+
+codeintelCmd
+  .command("digest")
+  .description("Print the structural digest for a git range (what the ingestor sends instead of a raw diff)")
+  .argument("[range]", "Git range (default HEAD~1..HEAD)")
+  .option("--json", "Print the code facts as JSON")
+  .action(async (range: string | undefined, opts) => {
+    try {
+      const digest = await buildStructuralDigest({ root: process.cwd(), range });
+      console.log(opts.json ? JSON.stringify(digest.facts, null, 2) : renderDigest(digest));
+    } catch (err) {
+      fail(err);
+    }
+  });
+
+codeintelCmd
+  .command("map")
+  .description("Print a ranked repo map (central files and their signatures) within a token budget")
+  .option("-b, --budget <tokens>", "Token budget", "1000")
+  .option("-f, --focus <paths...>", "Personalize the ranking toward these files")
+  .action(async (opts) => {
+    try {
+      const runtime = await loadCodeIntelRuntime();
+      if (!runtime) throw new Error(`The repo map needs ${CODEINTEL_PACKAGE} (L1). Run \`skill-forge codeintel status\`.`);
+      const graph = await buildRepoGraph(process.cwd(), new EntityExtractor(runtime));
+      console.log(renderRepoMap(graph, rankFiles(graph, opts.focus ?? []), Number(opts.budget) || 1000));
+    } catch (err) {
+      fail(err);
+    }
+  });
 
 // ── hook ───────────────────────────────────────────────────────────────────
 const hookCmd = program

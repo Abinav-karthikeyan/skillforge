@@ -3,6 +3,7 @@ import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { parse } from "yaml";
 import type { CalibrationConfig, CustomInstructions } from "../types/config.js";
+import type { SessionSummary } from "../types/session.js";
 import { promptVersionFromEnv, PROMPT_VERSION_ENV } from "../config/paths.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -117,4 +118,28 @@ export function applyCustomInstructions(
   ].join("\n");
 
   return systemPrompt + block;
+}
+
+const CODE_FACTS_RULE = [
+  "",
+  "---",
+  "Code facts rule — the summary carries deterministic measurements in `code_facts`:",
+  "  - Numbers, counts, and metrics (files, lines, entities, cyclomatic complexity, references, tests)",
+  "    may ONLY come from `code_facts`, or from figures stated verbatim elsewhere in the summary.",
+  "    Never estimate, round up, or derive new numbers.",
+  "  - Blast-radius entries with `approximate: true` are name-based: write them as \"~N\" or",
+  "    \"about N\", never as an exact count.",
+  "  - Prefer the concrete entity names in `code_facts` (e.g. a function whose complexity went",
+  "    from 14 to 6, a newly exported interface) over generic descriptions.",
+  "  - Frame the work to match `code_facts.classification`: a refactor is told as what got",
+  "    simpler and why, not as new functionality.",
+  "---",
+].join("\n");
+
+/**
+ * When a session carries code facts (v3 Pillar A), constrain every metric in
+ * the artifact to them. Sessions without code facts render exactly as before.
+ */
+export function applyCodeFactsRule(systemPrompt: string, session: SessionSummary): string {
+  return session.summary.code_facts ? systemPrompt + CODE_FACTS_RULE : systemPrompt;
 }

@@ -69,10 +69,21 @@ const generateToolConfig = {
       .enum(["low", "medium", "off"])
       .optional()
       .describe("Focus subagent budget tier. Defaults to config.focus_effort or 'low'."),
+    range: z
+      .string()
+      .optional()
+      .describe("Git range for code facts / the git fallback (e.g. 'main..HEAD'). Default HEAD~1..HEAD."),
+    with_code_facts: z
+      .boolean()
+      .optional()
+      .describe(
+        "With session_summary: also attach deterministic code facts computed from git for `range` " +
+          "(structural diff, complexity, tests, blast radius). Artifacts then take every number from those facts."
+      ),
   },
 } as const;
 
-const generateHandler = async ({ mode, session_summary, output_dir, connector, prompt_version, focus, focus_effort }: any): Promise<{ content: Array<{ type: "text"; text: string }>; isError?: boolean }> => {
+const generateHandler = async ({ mode, session_summary, output_dir, connector, prompt_version, focus, focus_effort, range, with_code_facts }: any): Promise<{ content: Array<{ type: "text"; text: string }>; isError?: boolean }> => {
     try {
       const config = loadCalibration();
       if (output_dir) config.output_dir = output_dir;
@@ -96,7 +107,10 @@ const generateHandler = async ({ mode, session_summary, output_dir, connector, p
           })
         : undefined;
 
-      const session = await ingestSession(client, rawJson);
+      const session = await ingestSession(client, rawJson, {
+        range,
+        withCodeFacts: Boolean(with_code_facts),
+      });
       const result = await generateArtifacts(client, config, session, resolveModes(mode), {
         promptVersion: prompt_version,
         focus,
