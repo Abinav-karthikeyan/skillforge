@@ -46,7 +46,7 @@ export function createClient(config: ProviderConfig = {}): LLMClient {
   }
 }
 
-function inferProviderFromEnv(): ProviderName {
+export function inferProviderFromEnv(): ProviderName {
   if (process.env.ANTHROPIC_API_KEY) return "anthropic";
   if (process.env.OPENAI_API_KEY) return "openai";
   // Fall back to Ollama — local, no key needed

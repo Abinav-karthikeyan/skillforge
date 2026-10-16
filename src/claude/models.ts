@@ -15,3 +15,14 @@ export const DEFAULT_MODELS = {
   openai: "gpt-4o-mini",
   ollama: "llama3.2",
 } as const;
+
+/**
+ * Cheap-tier models for the always-on observer (plan_v3 §3.3 warm path), which
+ * runs often over small inputs. `observer_model` in config overrides; for an
+ * openai-compatible endpoint (unknown tiers) the configured model is reused.
+ */
+export const CHEAP_MODELS = {
+  anthropic: "claude-haiku-5-5",
+  openai: "gpt-4o-mini",
+  ollama: "llama3.2",
+} as const;

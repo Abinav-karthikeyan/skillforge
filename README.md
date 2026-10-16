@@ -333,6 +333,39 @@ The instructions appear as a clearly delimited block at the end of the system pr
 
 ---
 
+## Always-on observer (opt-in)
+
+A `/skill-forge` pass at the end of a long session sees a compacted transcript, and compaction drops the dead ends first. The observer captures them while they happen: Claude Code hooks feed a local, redacted journal; deterministic detectors spot the moments worth keeping; a cheap model turns them into cited observations; and at session end a reflector merges them into a **story candidate** for you to review.
+
+```bash
+npm i -g @abhinavravich1999/skill-forge     # the hooks call the installed bins, never npx
+skill-forge observe enable                  # opt this repository in (add --confidential for employer code)
+skill-forge observe install                 # write the hooks into ~/.claude/settings.json
+# …or install the Claude Code plugin instead of `observe install`:
+#   /plugin marketplace add Abinav-karthikeyan/skillforge
+#   /plugin install skill-forge@skill-forge
+
+skill-forge inbox                           # review story candidates (or /skill-forge-review in Claude Code)
+skill-forge inbox approve <id> --mode all   # approve → generate artifacts; later evidence updates them in place
+skill-forge backfill --since 30d            # import past Claude Code transcripts for enabled repos
+```
+
+How it works (plan_v3 §3):
+
+| Speed | What runs | Cost |
+|---|---|---|
+| **Hot** (every hook event) | `skill-forge-observe`: normalize → redact → append to `~/.skill-forge/journal/<session>.jsonl` → boundary detectors | No LLM. ~10 ms of work per event; a separate bin so each event skips the full CLI's startup |
+| **Warm** (at milestones) | A detached worker sends the journal slice since the last watermark to the observer model and stores cited observations in the story ledger | One cheap-model call, debounced (≥ 2 min) and capped (6/hour by default) |
+| **Cold** (session end, next session start, `skill-forge reflect`) | The reflector merges observations (+ code facts for the session's commits) into a story candidate. Approved stories whose evidence changed get their artifacts regenerated in place | One call per session |
+
+- **Detectors** (deterministic): a test runner failing ≥ 2× then passing (debugging arc); a file created then deleted, edits reverted, or `git stash`/`reset --hard` (dead end); packages installed or manifests edited; decision language in a prompt ("instead of", "why not", "trade-off"); commits; compaction (forces a snapshot); many tool calls since the last observation.
+- **Privacy**: off by default and enabled per repository. Secrets are redacted before anything is written: API keys and tokens for 15+ providers, JWTs, private keys, connection-string passwords, `password=`/`secret=` assignments, and `.env` contents (a CI corpus test proves none survive). The journal stores file paths, never file contents. Raw journals expire after 30 days; `skill-forge forget --session <id> | --repo <path>` deletes everything observed. **Confidential repos** run the observer on a local Ollama model only, and the prompts abstract proprietary names.
+- **Never in the way**: capture hooks are `async`, always exit 0, and do nothing in repositories you haven't enabled. SessionStart prints a one-line notice when candidates are waiting. Question mode (opt-in, at most one question per session) asks what drove a decision.
+- **Models**: `observer_model` in config (default: your provider's cheap tier, e.g. `claude-haiku-5-5`); `observer_local_model` for confidential repos.
+- Settings live in `~/.skill-forge/observe.json` (`skill-forge observe status`). `npx tsx scripts/observer-replay.ts` runs the replay eval (observer recall vs an end-of-session pass) with your provider.
+
+---
+
 ## Code intelligence (optional companion)
 
 Every git-path run computes **code facts**: deterministic, LLM-free measurements of the change that the translators must take every number from. Without anything extra you get git-level facts (**L0**: files, lines, symbols named in hunk headers, a feature/refactor/fix/test/config/docs classification). Install the companion for structural facts (**L1**):
@@ -504,6 +537,7 @@ src/
   claude/         # LLM client — provider factory + Anthropic / OpenAI-compatible providers (chat + native tool loops)
   pipeline/       # generate.ts — shared translate → write → record-story pipeline (CLI, MCP, hook)
   codeintel/      # Code facts: structural digest, entity diff, complexity, repo map, fingerprint (L0 git / L1 tree-sitter)
+  observer/       # Always-on observer: capture bin, redaction, detectors, journal, observer/reflector workers, inbox, backfill
   ledger/         # Story ledger (stories, observations, evidence) + legacy index.yml migration
   eval/           # Judge rubric + deterministic metric-honesty check
   hooks/          # Host hook entry points (post-commit)

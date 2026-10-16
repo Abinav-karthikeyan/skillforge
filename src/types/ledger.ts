@@ -23,6 +23,7 @@ export const ObservedEventKindSchema = z.enum([
   "test_run",
   "commit",
   "compaction",
+  "turn_end",
   "session_start",
   "session_end",
 ]);

@@ -1,0 +1,33 @@
+{
+  "name": "auth-service",
+  "description": "Synthesized from the Claude Code hooks reference (not a recorded session): server-side sessions are tried and reverted, RS256 is chosen over HS256, and pytest fails three times on token-family invalidation before passing.",
+  "session_id": "fixture-auth-service",
+  "gold": {
+    "dead_ends": [{ "detector": "session_store.py", "keywords": ["server-side session", "session store", "session_store"] }],
+    "debug_arcs": [{ "detector": "pytest", "keywords": ["family", "reuse", "refresh"] }],
+    "tradeoffs": [{ "detector": "rather than", "keywords": ["rs256"] }],
+    "dependencies": ["pyjwt"],
+    "checkpoints": 1,
+    "snapshots": 0
+  },
+  "payloads": [
+    { "hook_event_name": "SessionStart", "source": "startup" },
+    { "hook_event_name": "UserPromptSubmit", "prompt": "Each service does its own auth. Build a central auth service with refresh tokens in FastAPI." },
+    { "hook_event_name": "PostToolUse", "tool_name": "Edit", "tool_input": { "file_path": "auth/session_store.py" }, "tool_response": {} },
+    { "hook_event_name": "PostToolUse", "tool_name": "Edit", "tool_input": { "file_path": "auth/routes.py" }, "tool_response": {} },
+    { "hook_event_name": "Stop", "last_assistant_message": "Started with server-side sessions stored in Postgres." },
+    { "hook_event_name": "UserPromptSubmit", "prompt": "Downstream services can't call us on every request. Let's go with stateless JWTs signed with RS256 rather than HS256 so services only need the public key." },
+    { "hook_event_name": "PostToolUse", "tool_name": "Bash", "tool_input": { "command": "git restore auth/session_store.py" }, "tool_response": { "stdout": "" } },
+    { "hook_event_name": "PostToolUse", "tool_name": "Bash", "tool_input": { "command": "pip install pyjwt[crypto]" }, "tool_response": { "stdout": "Successfully installed pyjwt-2.9.0" } },
+    { "hook_event_name": "PostToolUse", "tool_name": "Write", "tool_input": { "file_path": "auth/tokens.py" }, "tool_response": { "filePath": "auth/tokens.py", "type": "create" } },
+    { "hook_event_name": "PostToolUseFailure", "tool_name": "Bash", "tool_input": { "command": "pytest tests/test_refresh.py" }, "error": "Exit code 1\nFAILED test_reuse_invalidates_family - AssertionError: sibling token still valid", "is_interrupt": false },
+    { "hook_event_name": "PostToolUseFailure", "tool_name": "Bash", "tool_input": { "command": "pytest tests/test_refresh.py" }, "error": "Exit code 1\nFAILED test_reuse_invalidates_family - KeyError: 'family_id'", "is_interrupt": false },
+    { "hook_event_name": "PostToolUse", "tool_name": "Edit", "tool_input": { "file_path": "auth/tokens.py" }, "tool_response": {} },
+    { "hook_event_name": "PostToolUseFailure", "tool_name": "Bash", "tool_input": { "command": "pytest tests/test_refresh.py" }, "error": "Exit code 1\nFAILED test_reuse_invalidates_family - redis TTL not set on family key", "is_interrupt": false },
+    { "hook_event_name": "PostToolUse", "tool_name": "Edit", "tool_input": { "file_path": "auth/tokens.py" }, "tool_response": {} },
+    { "hook_event_name": "PostToolUse", "tool_name": "Bash", "tool_input": { "command": "pytest" }, "tool_response": { "stdout": "22 passed in 1.84s" } },
+    { "hook_event_name": "Stop", "last_assistant_message": "Refresh-token reuse now invalidates the whole token family; the family key carries the refresh TTL." },
+    { "hook_event_name": "PostToolUse", "tool_name": "Bash", "tool_input": { "command": "git add -A && git commit -m \"feat: stateless auth with refresh token families\"" }, "tool_response": { "stdout": "[main 9b1e4d2] feat: stateless auth with refresh token families" } },
+    { "hook_event_name": "SessionEnd", "reason": "prompt_input_exit" }
+  ]
+}

@@ -5,7 +5,8 @@
   "main": "dist/index.js",
   "bin": {
     "skill-forge": "dist/index.js",
-    "skill-forge-mcp": "dist/mcp/server.js"
+    "skill-forge-mcp": "dist/mcp/server.js",
+    "skill-forge-observe": "dist/observer/observe-bin.js"
   },
   "files": [
     "dist/",

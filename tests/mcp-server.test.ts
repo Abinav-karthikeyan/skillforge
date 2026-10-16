@@ -24,6 +24,10 @@ const EXPECTED_TOOLS = [
   "list_skill_forge_artifacts",
   "notion_auth_status",
   "share_last_artifact",
+  // v3 observer review inbox
+  "list_story_candidates",
+  "approve_story",
+  "discard_story",
   // Deprecated aliases kept for one release (see src/config/paths.ts migration window)
   "generate_career_artifact",
   "list_career_artifacts",

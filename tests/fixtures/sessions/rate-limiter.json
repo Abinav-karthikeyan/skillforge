@@ -1,0 +1,35 @@
+{
+  "name": "rate-limiter",
+  "description": "Synthesized from the Claude Code hooks reference (not a recorded session): a fixed-window limiter is written, abandoned for a token bucket, the suite fails twice before passing, ioredis is added, and the work is committed before an auto-compaction.",
+  "session_id": "fixture-rate-limiter",
+  "gold": {
+    "dead_ends": [{ "detector": "fixed-window.ts", "keywords": ["fixed window", "fixed-window"] }],
+    "debug_arcs": [{ "detector": "npm test", "keywords": ["redis", "mock", "test"] }],
+    "tradeoffs": [{ "detector": "instead of", "keywords": ["token bucket"] }],
+    "dependencies": ["ioredis"],
+    "checkpoints": 1,
+    "snapshots": 1
+  },
+  "payloads": [
+    { "hook_event_name": "SessionStart", "source": "startup" },
+    { "hook_event_name": "UserPromptSubmit", "prompt": "Our public API gets hammered by one tenant. Add per-tenant rate limiting to the Express gateway." },
+    { "hook_event_name": "PostToolUse", "tool_name": "Read", "tool_input": { "file_path": "src/gateway/server.ts" }, "tool_response": { "type": "text" } },
+    { "hook_event_name": "PostToolUse", "tool_name": "Write", "tool_input": { "file_path": "src/limiter/fixed-window.ts" }, "tool_response": { "filePath": "src/limiter/fixed-window.ts", "type": "create" } },
+    { "hook_event_name": "Stop", "last_assistant_message": "I added a fixed-window counter keyed by tenant id, reset every 60 seconds." },
+    { "hook_event_name": "UserPromptSubmit", "prompt": "Fixed windows let a tenant burst 2x at the boundary. Should we use a token bucket instead of a fixed window?" },
+    { "hook_event_name": "PostToolUse", "tool_name": "Write", "tool_input": { "file_path": "src/limiter/token-bucket.ts" }, "tool_response": { "filePath": "src/limiter/token-bucket.ts", "type": "create" } },
+    { "hook_event_name": "PostToolUse", "tool_name": "Bash", "tool_input": { "command": "rm src/limiter/fixed-window.ts" }, "tool_response": { "stdout": "", "stderr": "" } },
+    { "hook_event_name": "PostToolUse", "tool_name": "Bash", "tool_input": { "command": "npm install ioredis" }, "tool_response": { "stdout": "added 9 packages" } },
+    { "hook_event_name": "PostToolUse", "tool_name": "Edit", "tool_input": { "file_path": "package.json" }, "tool_response": {} },
+    { "hook_event_name": "PostToolUseFailure", "tool_name": "Bash", "tool_input": { "command": "npm test" }, "error": "Exit code 1\nFAIL tests/limiter.test.ts\n  ECONNREFUSED 127.0.0.1:6379 — redis not reachable in tests", "is_interrupt": false },
+    { "hook_event_name": "PostToolUse", "tool_name": "Edit", "tool_input": { "file_path": "tests/limiter.test.ts" }, "tool_response": {} },
+    { "hook_event_name": "PostToolUseFailure", "tool_name": "Bash", "tool_input": { "command": "npm test" }, "error": "Exit code 1\nFAIL tests/limiter.test.ts\n  expected 429, received 200 — refill rate computed per ms instead of per s", "is_interrupt": false },
+    { "hook_event_name": "PostToolUse", "tool_name": "Edit", "tool_input": { "file_path": "src/limiter/token-bucket.ts" }, "tool_response": {} },
+    { "hook_event_name": "PostToolUse", "tool_name": "Bash", "tool_input": { "command": "npm test" }, "tool_response": { "stdout": "Tests 14 passed (14)" } },
+    { "hook_event_name": "Stop", "last_assistant_message": "Replaced the fixed window with a Redis-backed token bucket (ioredis), mocked Redis in tests with ioredis-mock, and fixed the refill rate unit bug." },
+    { "hook_event_name": "PostToolUse", "tool_name": "Bash", "tool_input": { "command": "git commit -am \"feat: token-bucket rate limiter per tenant\"" }, "tool_response": { "stdout": "[main 3f2a9c1] feat: token-bucket rate limiter per tenant\n 4 files changed, 212 insertions(+), 3 deletions(-)" } },
+    { "hook_event_name": "PreCompact", "trigger": "auto", "custom_instructions": null },
+    { "hook_event_name": "PostCompact", "trigger": "auto", "compact_summary": "Built per-tenant rate limiting for the gateway using a Redis token bucket." },
+    { "hook_event_name": "SessionEnd", "reason": "other" }
+  ]
+}

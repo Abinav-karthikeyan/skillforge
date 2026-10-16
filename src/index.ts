@@ -21,6 +21,20 @@ import { loadAllStories, migrateIndexToLedger } from "./ledger/migrate.js";
 import { projectStory, StoryStatus } from "./types/ledger.js";
 import { formatJudgeTable, judgeArtifact, JudgeResult, modeFromFrontmatter } from "./eval/judge.js";
 import { hookLog, runPostCommitHook } from "./hooks/post-commit.js";
+import { Journal } from "./observer/journal.js";
+import {
+  findRepoRoot,
+  loadObserveSettings,
+  normalizeRepoPath,
+  observeSettingsPath,
+  saveObserveSettings,
+} from "./observer/settings.js";
+import { claudeSettingsPath, installObserverHooks, uninstallObserverHooks } from "./observer/install.js";
+import { runObserverPass } from "./observer/worker.js";
+import { reflectPending, reflectSession } from "./observer/reflector.js";
+import { approveStory, describeCandidate, discardStory, listCandidates } from "./observer/inbox.js";
+import { backfillTranscripts, parseDuration } from "./observer/backfill.js";
+import { forgetSessions, sessionsForRepo } from "./observer/forget.js";
 import {
   buildRepoGraph,
   buildStructuralDigest,
@@ -400,6 +414,284 @@ codeintelCmd
       if (!runtime) throw new Error(`The repo map needs ${CODEINTEL_PACKAGE} (L1). Run \`skill-forge codeintel status\`.`);
       const graph = await buildRepoGraph(process.cwd(), new EntityExtractor(runtime));
       console.log(renderRepoMap(graph, rankFiles(graph, opts.focus ?? []), Number(opts.budget) || 1000));
+    } catch (err) {
+      fail(err);
+    }
+  });
+
+// ── observer (always-on capture) ───────────────────────────────────────────
+const observeCmd = program
+  .command("observe")
+  .description("Always-on observer: capture sessions as they happen (opt-in per repository)");
+
+function repoArg(path: string | undefined): string {
+  const root = findRepoRoot(path ?? process.cwd());
+  if (!root) throw new Error(`${path ?? process.cwd()} is not inside a git repository.`);
+  return root;
+}
+
+observeCmd
+  .command("enable")
+  .description("Enable observation for a repository (default: the current one)")
+  .argument("[path]", "Repository path")
+  .option("--confidential", "Confidential repo: local observer model only, proprietary names abstracted")
+  .action((path: string | undefined, opts) => {
+    try {
+      const repo = repoArg(path);
+      const settings = loadObserveSettings();
+      const key = normalizeRepoPath(repo);
+      if (!settings.enabled.some((p) => normalizeRepoPath(p) === key)) settings.enabled.push(repo);
+      settings.confidential = settings.confidential.filter((p) => normalizeRepoPath(p) !== key);
+      if (opts.confidential) settings.confidential.push(repo);
+      saveObserveSettings(settings);
+      console.log(`✓ Observation enabled for ${repo}${opts.confidential ? " (confidential)" : ""}`);
+      console.log("  Hooks: `skill-forge observe install` (or install the Claude Code plugin). Settings: " + observeSettingsPath());
+    } catch (err) {
+      fail(err);
+    }
+  });
+
+observeCmd
+  .command("disable")
+  .description("Disable observation for a repository (default: the current one)")
+  .argument("[path]", "Repository path")
+  .action((path: string | undefined) => {
+    try {
+      const repo = repoArg(path);
+      const key = normalizeRepoPath(repo);
+      const settings = loadObserveSettings();
+      settings.enabled = settings.enabled.filter((p) => normalizeRepoPath(p) !== key);
+      settings.confidential = settings.confidential.filter((p) => normalizeRepoPath(p) !== key);
+      saveObserveSettings(settings);
+      console.log(`✓ Observation disabled for ${repo}. Existing journals stay until \`skill-forge forget --repo\`.`);
+    } catch (err) {
+      fail(err);
+    }
+  });
+
+observeCmd
+  .command("status")
+  .description("Show observer settings, enabled repositories, and journaled sessions")
+  .action(() => {
+    const settings = loadObserveSettings();
+    const journal = new Journal();
+    console.log(`Settings: ${observeSettingsPath()}`);
+    console.log(`Observer: ${settings.observer} · notify ${settings.notify ? "on" : "off"} · question ${settings.question ? "on" : "off"} · ≤${settings.max_observer_calls_per_hour} observer calls/hour · journal TTL ${settings.retention_days}d`);
+    console.log(`Enabled repositories (${settings.enabled.length}):`);
+    for (const r of settings.enabled) {
+      const conf = settings.confidential.some((c) => normalizeRepoPath(c) === normalizeRepoPath(r));
+      console.log(`  ${r}${conf ? "  [confidential]" : ""}`);
+    }
+    const states = journal.allStates();
+    console.log(`Journaled sessions: ${states.length} (${states.filter((s) => s.reflected_through_seq < s.seq).length} awaiting reflection)`);
+    console.log(`Story candidates in inbox: ${journal.readInboxCount()}`);
+  });
+
+observeCmd
+  .command("install")
+  .description("Write the observer hooks into Claude Code settings.json")
+  .option("--scope <scope>", "user | project", "user")
+  .action((opts) => {
+    try {
+      if (!["user", "project"].includes(opts.scope)) throw new Error("--scope must be user or project");
+      const path = claudeSettingsPath(opts.scope);
+      const { added } = installObserverHooks(path);
+      console.log(`✓ Observer hooks written to ${path} (${added.join(", ")})`);
+      console.log("  Capture is a no-op until a repository is enabled: `skill-forge observe enable`.");
+    } catch (err) {
+      fail(err);
+    }
+  });
+
+observeCmd
+  .command("uninstall")
+  .description("Remove the observer hooks from Claude Code settings.json")
+  .option("--scope <scope>", "user | project", "user")
+  .action((opts) => {
+    try {
+      const path = claudeSettingsPath(opts.scope);
+      const { removed } = uninstallObserverHooks(path);
+      console.log(removed ? `✓ Observer hooks removed from ${path}` : `No observer hooks in ${path}`);
+    } catch (err) {
+      fail(err);
+    }
+  });
+
+observeCmd
+  .command("purge")
+  .description("Delete raw journals older than the retention TTL (observations and stories are kept)")
+  .action(() => {
+    const settings = loadObserveSettings();
+    const removed = new Journal().purge(settings.retention_days);
+    console.log(`✓ Purged ${removed.length} journal(s) older than ${settings.retention_days} days.`);
+  });
+
+// Hidden: the detached worker the capture hooks spawn.
+program
+  .command("observe-worker", { hidden: true })
+  .option("--session <id>", "Session to observe")
+  .option("--force", "Ignore the hourly observer budget")
+  .option("--reflect", "After observing, reflect the session into a story")
+  .option("--catch-up", "Reflect every session whose reflection is behind")
+  .action(async (opts) => {
+    const log = (line: string) => hookLog(`observer: ${line}`);
+    try {
+      if (opts.catchUp) {
+        const results = await reflectPending();
+        log(`catch-up reflected ${results.length} session(s)`);
+      } else if (opts.session) {
+        if (opts.reflect) {
+          const r = await reflectSession(opts.session);
+          log(`${opts.session}: ${r.story ? `story ${r.story.story_id} v${r.story.version}` : r.skipped}`);
+        } else {
+          const r = await runObserverPass(opts.session, { force: Boolean(opts.force) });
+          log(`${opts.session}: ${r.skipped ?? `${r.observations.length} observation(s)`}`);
+        }
+      }
+    } catch (err) {
+      log(`error: ${(err as Error).message}`);
+    }
+    process.exit(0);
+  });
+
+program
+  .command("reflect")
+  .description("Merge observed sessions into story candidates (and refresh approved living artifacts)")
+  .option("--session <id>", "Reflect one session")
+  .option("--all", "Reflect every session with unreflected events, not only ended/idle ones")
+  .option("--no-regenerate", "Don't regenerate artifacts of approved stories")
+  .action(async (opts) => {
+    try {
+      const results = opts.session
+        ? [{ session: opts.session, ...(await reflectSession(opts.session, { regenerate: opts.regenerate })) }]
+        : await reflectPending({ all: Boolean(opts.all), regenerate: opts.regenerate });
+      if (results.length === 0) console.log("Nothing to reflect.");
+      for (const r of results) {
+        console.log(
+          r.story
+            ? `✓ ${r.session} → ${r.story.story_id} v${r.story.version} (${r.story.status})${r.regenerated?.length ? `, regenerated ${r.regenerated.length} artifact(s)` : ""}`
+            : `- ${r.session}: ${r.skipped}`
+        );
+      }
+    } catch (err) {
+      fail(err);
+    }
+  });
+
+const inboxCmd = program
+  .command("inbox")
+  .description("Review story candidates from the observer (nothing is published without approval)");
+
+inboxCmd
+  .command("list", { isDefault: true })
+  .description("List story candidates")
+  .action(() => {
+    try {
+      const config = loadCalibration();
+      const ledger = StoryLedger.forArtifactsDir(resolveArtifactsDir(config.output_dir));
+      const candidates = listCandidates({ config, ledger });
+      if (candidates.length === 0) {
+        console.log("Inbox is empty.");
+        return;
+      }
+      for (const s of candidates) console.log(describeCandidate(s, ledger.listObservations(s.session_ids[0]).length));
+      console.log("\nApprove: `skill-forge inbox approve <id> [--mode all]` · Discard: `skill-forge inbox discard <id>`");
+    } catch (err) {
+      fail(err);
+    }
+  });
+
+inboxCmd
+  .command("show")
+  .description("Show a candidate's story and the observations behind it")
+  .argument("<id>", "Story id")
+  .action((id: string) => {
+    try {
+      const config = loadCalibration();
+      const ledger = StoryLedger.forArtifactsDir(resolveArtifactsDir(config.output_dir));
+      const story = ledger.get(id);
+      if (!story) throw new Error(`No story "${id}"`);
+      console.log(`${story.title}  (${story.status}, v${story.version})\n`);
+      if (story.summary) {
+        console.log(`${story.summary.one_liner}\n`);
+        for (const t of story.summary.tradeoffs) console.log(`  tradeoff: ${t.decision} — ${t.reasoning} (vs ${t.alternative_considered})`);
+        for (const d of story.summary.dead_ends) console.log(`  dead end: ${d}`);
+      }
+      console.log("\nObservations:");
+      for (const sid of story.session_ids) {
+        for (const o of ledger.listObservations(sid)) console.log(`  [${o.kind} ${o.confidence}] ${o.claim}`);
+      }
+    } catch (err) {
+      fail(err);
+    }
+  });
+
+inboxCmd
+  .command("approve")
+  .description("Approve a candidate and generate artifacts from it")
+  .argument("<id>", "Story id")
+  .option("-m, --mode <mode>", "Mode(s) to generate: interview-qa, portfolio-bullet, technical-deep-dive, all", "portfolio-bullet")
+  .option("--no-generate", "Approve without generating")
+  .action(async (id: string, opts) => {
+    try {
+      const { story, generated } = await approveStory(id, opts.generate ? resolveModes(opts.mode) : false);
+      console.log(`✓ ${story.story_id} approved`);
+      for (const a of generated?.artifacts ?? []) console.log(`✓ ${a.mode}: ${a.location}`);
+    } catch (err) {
+      fail(err);
+    }
+  });
+
+inboxCmd
+  .command("discard")
+  .description("Discard a candidate")
+  .argument("<id>", "Story id")
+  .action((id: string) => {
+    try {
+      console.log(`✓ ${discardStory(id).story_id} discarded`);
+    } catch (err) {
+      fail(err);
+    }
+  });
+
+program
+  .command("backfill")
+  .description("Import existing Claude Code transcripts for enabled repositories, then observe and reflect them")
+  .option("--since <duration>", "How far back (e.g. 30d, 12h, 2w)", "30d")
+  .option("--no-llm", "Import into the journal only; skip the observer/reflector passes")
+  .option("--force", "Re-import sessions already in the journal")
+  .action(async (opts) => {
+    try {
+      const imported = backfillTranscripts({ sinceMs: Date.now() - parseDuration(opts.since), force: Boolean(opts.force) });
+      for (const s of imported.skipped.filter((x) => x.reason !== "repository not enabled for observation")) {
+        console.log(`- ${s.file}: ${s.reason}`);
+      }
+      console.log(`✓ Imported ${imported.imported.length} session(s) from enabled repositories.`);
+      if (!opts.llm) return;
+      for (const s of imported.imported) {
+        const r = await reflectSession(s.session, { regenerate: false });
+        console.log(r.story ? `  ✓ ${s.session} → ${r.story.title}` : `  - ${s.session}: ${r.skipped}`);
+      }
+      console.log("Review with `skill-forge inbox`.");
+    } catch (err) {
+      fail(err);
+    }
+  });
+
+program
+  .command("forget")
+  .description("Delete observed data: raw journals, observations, and observer-made stories")
+  .option("--session <id>", "One session")
+  .option("--repo <path>", "Every session from a repository")
+  .action((opts) => {
+    try {
+      if (!opts.session && !opts.repo) throw new Error("Pass --session <id> or --repo <path>.");
+      const config = loadCalibration();
+      const journal = new Journal();
+      const ledger = StoryLedger.forArtifactsDir(resolveArtifactsDir(config.output_dir));
+      const sessions = opts.session ? [opts.session] : sessionsForRepo(journal, opts.repo);
+      const r = forgetSessions(sessions, journal, ledger);
+      console.log(`✓ Forgot ${r.sessions.length} session(s) and ${r.stories.length} observer stor${r.stories.length === 1 ? "y" : "ies"}.`);
     } catch (err) {
       fail(err);
     }

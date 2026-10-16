@@ -1,4 +1,5 @@
-import { readFileSync } from "fs";
+import { existsSync, readFileSync } from "fs";
+import { observerHooks } from "../../src/observer/install.js";
 import { join } from "path";
 import { describe, expect, it } from "vitest";
 import { parseHookPayload, runPostCommitHook, shouldProcess } from "../../src/hooks/post-commit.js";
@@ -53,6 +54,33 @@ describe("post-commit hook gate", () => {
   it("returns without generating (or calling an LLM) for a non-commit payload", async () => {
     const result = await runPostCommitHook(JSON.stringify({ tool_name: "Bash", tool_input: { command: "ls" } }));
     expect(result).toEqual({ ran: false, reason: "not a git commit" });
+  });
+});
+
+describe("Claude Code plugin packaging", () => {
+  const read = (...p: string[]) => JSON.parse(readFileSync(join(root, ...p), "utf-8"));
+  const plugin = read(".claude-plugin", "plugin.json");
+
+  it("tracks the package version and points at files that exist", () => {
+    expect(plugin.name).toBe("skill-forge");
+    expect(plugin.version).toBe(read("package.json").version);
+    for (const dir of plugin.commands) expect(existsSync(join(root, dir))).toBe(true);
+    expect(existsSync(join(root, plugin.hooks))).toBe(true);
+    expect(existsSync(join(root, "skills", "skill-forge", "SKILL.md"))).toBe(true);
+    expect(plugin.mcpServers["skill-forge"].command).toBe("skill-forge-mcp");
+  });
+
+  it("ships exactly the observer hooks `skill-forge observe install` writes", () => {
+    expect(read(...plugin.hooks.split("/").slice(1))).toEqual({ hooks: observerHooks() });
+  });
+
+  it("lists itself in the repo marketplace", () => {
+    const market = read(".claude-plugin", "marketplace.json");
+    expect(market.plugins).toEqual([expect.objectContaining({ name: "skill-forge", source: "./" })]);
+  });
+
+  it("registers the lightweight capture bin", () => {
+    expect(read("package.json").bin["skill-forge-observe"]).toBe("dist/observer/observe-bin.js");
   });
 });
 

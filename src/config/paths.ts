@@ -28,6 +28,8 @@ const LEGACY_CONFIG_DIRNAME = ".career-mode";
  * installs always get the new directory.
  */
 export function configDir(): string {
+  // Explicit override (tests, sandboxes, multiple profiles).
+  if (process.env.SKILL_FORGE_HOME) return process.env.SKILL_FORGE_HOME;
   const preferred = join(homedir(), CONFIG_DIRNAME);
   if (existsSync(preferred)) return preferred;
   const legacy = join(homedir(), LEGACY_CONFIG_DIRNAME);
@@ -107,6 +109,11 @@ export function ledgerDirFor(artifactsDir: string): string {
 /** User-global log directory (hook runs, background workers). */
 export function logsDir(): string {
   return join(configDir(), "logs");
+}
+
+/** Observer journal: one redacted JSONL per observed session, plus state files. */
+export function journalDir(): string {
+  return join(configDir(), "journal");
 }
 
 /** Name of the env var that overrides the active prompt version. */

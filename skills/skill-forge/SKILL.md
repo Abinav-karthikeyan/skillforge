@@ -126,6 +126,17 @@ result in the summary's `code_facts.blast_radius` entries with
 to `"lsp"`. Only do this with real tool results; never mark a guessed count as
 precise.
 
+## Story candidates from the always-on observer
+
+If the user has the observer enabled (`skill-forge observe status`), stories may
+already be waiting: the observer drafts them from live sessions, including the dead
+ends that compaction would otherwise erase. When the user asks what they have to show
+for recent work, check first with the `list_story_candidates` MCP tool (or
+`skill-forge inbox`) before synthesizing a summary yourself. Approve or discard only
+on the user's say-so (`approve_story` / `discard_story`, or `skill-forge inbox approve
+<id> --mode <mode>`). Approved stories are living artifacts: later sessions that add
+evidence update them in place.
+
 ## Choosing a mode
 
 | The user wants… | Mode |

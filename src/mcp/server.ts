@@ -17,6 +17,9 @@ import { resolveArtifactsDir } from "../config/paths.js";
 import { SessionSummarySchema } from "../types/session.js";
 import { generateArtifacts, resolveModes } from "../pipeline/generate.js";
 import { VERSION } from "../version.js";
+import { StoryLedger } from "../ledger/store.js";
+import { approveStory, discardStory, listCandidates } from "../observer/inbox.js";
+import { projectStory } from "../types/ledger.js";
 
 function parseFrontmatterArray(markdown: string, key: string): string[] {
   const match = markdown.match(new RegExp(`^${key}:\\s*\\[(.*)\\]`, "m"));
@@ -311,6 +314,106 @@ server.registerTool(
         },
       ],
     };
+  }
+);
+
+// ── observer review inbox (v3 Pillar B) ─────────────────────────────────────
+
+const errorResult = (err: unknown) => ({
+  content: [{ type: "text" as const, text: `Error: ${(err as Error).message}` }],
+  isError: true,
+});
+
+server.registerTool(
+  "list_story_candidates",
+  {
+    title: "List story candidates",
+    description:
+      "List stories the always-on observer drafted from recent coding sessions that are waiting for the user's review. " +
+      "Show them to the user and ask which to approve (generate artifacts) or discard. Nothing is published until approved.",
+    inputSchema: {
+      output_dir: z.string().optional().describe("Override the configured artifacts directory."),
+    },
+  },
+  async ({ output_dir }) => {
+    try {
+      const config = loadCalibration();
+      if (output_dir) config.output_dir = output_dir;
+      const ledger = StoryLedger.forArtifactsDir(resolveArtifactsDir(config.output_dir));
+      const candidates = listCandidates({ config, ledger });
+      if (candidates.length === 0) return { content: [{ type: "text", text: "No story candidates waiting for review." }] };
+      const blocks = candidates.map((s) => {
+        const obs = s.session_ids.flatMap((sid) => ledger.listObservations(sid));
+        return [
+          `### ${s.title}`,
+          `id: ${s.story_id} · v${s.version}${s.code_facts ? ` · ${s.code_facts.classification}, ${s.code_facts.files_changed} files` : ""}`,
+          s.summary ? s.summary.one_liner : "",
+          ...obs.slice(0, 8).map((o) => `- [${o.kind}] ${o.claim}`),
+        ]
+          .filter(Boolean)
+          .join("\n");
+      });
+      return { content: [{ type: "text", text: blocks.join("\n\n") }] };
+    } catch (err) {
+      return errorResult(err);
+    }
+  }
+);
+
+server.registerTool(
+  "approve_story",
+  {
+    title: "Approve story candidate",
+    description:
+      "Approve an observer story candidate (only after the user says so) and optionally generate artifacts from it. " +
+      "The story becomes a living artifact: later sessions that add evidence update it in place.",
+    inputSchema: {
+      story_id: z.string().describe("Story id from list_story_candidates."),
+      mode: MODE_ENUM.optional().describe("Generate these artifacts after approving. Omit to approve without generating."),
+      connector: z.string().optional().describe(`Output connector (${listConnectors().join(", ")}).`),
+      output_dir: z.string().optional().describe("Override the configured artifacts directory."),
+    },
+  },
+  async ({ story_id, mode, connector, output_dir }) => {
+    try {
+      const config = loadCalibration();
+      if (output_dir) config.output_dir = output_dir;
+      if (connector) config.connector = connector;
+      const { story, generated } = await approveStory(story_id, mode ? resolveModes(mode) : false, { config });
+      const sections = [`Approved ${story.story_id}: ${story.title}`];
+      for (const a of generated?.artifacts ?? []) {
+        sections.push(
+          config.connector === RETURN_ONLY
+            ? formatReturnOnly(a.output, projectStory(story), a.location)
+            : `### ${a.mode}\nWritten to: ${a.location}\n\n${a.output.content}`
+        );
+      }
+      return { content: [{ type: "text", text: sections.join("\n\n---\n\n") }] };
+    } catch (err) {
+      return errorResult(err);
+    }
+  }
+);
+
+server.registerTool(
+  "discard_story",
+  {
+    title: "Discard story candidate",
+    description: "Discard an observer story candidate the user doesn't want.",
+    inputSchema: {
+      story_id: z.string().describe("Story id from list_story_candidates."),
+      output_dir: z.string().optional().describe("Override the configured artifacts directory."),
+    },
+  },
+  async ({ story_id, output_dir }) => {
+    try {
+      const config = loadCalibration();
+      if (output_dir) config.output_dir = output_dir;
+      const story = discardStory(story_id, { config });
+      return { content: [{ type: "text", text: `Discarded ${story.story_id}: ${story.title}` }] };
+    } catch (err) {
+      return errorResult(err);
+    }
   }
 );
 

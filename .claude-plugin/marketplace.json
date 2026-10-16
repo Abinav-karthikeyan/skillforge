@@ -1,0 +1,14 @@
+{
+  "name": "skill-forge",
+  "description": "skill-forge: typed, calibrated career artifacts from your coding sessions, plus an opt-in always-on observer.",
+  "owner": {
+    "name": "Abinav Karthikeyan"
+  },
+  "plugins": [
+    {
+      "name": "skill-forge",
+      "source": "./",
+      "description": "Turn coding sessions into interview-ready stories, resume bullets, and technical deep-dives — with an opt-in always-on observer that captures dead ends and tradeoffs as they happen."
+    }
+  ]
+}

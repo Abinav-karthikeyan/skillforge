@@ -8,6 +8,45 @@ back-compatible renames).
 
 Work toward the v3 roadmap in `plan_v3.md`, one phase at a time.
 
+### Phase 3.2 — Always-on observer (Claude Code first)
+- **Capture (hot path):** new `skill-forge-observe` bin for Claude Code hooks (SessionStart,
+  UserPromptSubmit, PostToolUse(Failure), Stop, SubagentStop, Pre/PostCompact, SessionEnd).
+  It normalizes, redacts, and appends to `~/.skill-forge/journal/<session>.jsonl` with
+  transcript byte watermarks. No LLM and no SDK imports: about 10 ms of work per event (CI
+  asserts p95 < 50 ms), about 187 ms end to end versus about 1 s for the full CLI. Off unless
+  the repo is enabled; always exits 0.
+- **Redaction before persistence:** 15+ token formats, JWTs, private keys, connection-string
+  passwords, secret-named assignments and keys, `.env` and other secret files; file contents
+  are never journaled; long output is capped. A corpus test asserts zero survivors.
+- **Deterministic boundary detectors:** debugging arcs, dead ends (created-then-deleted
+  files, reverts, stash/reset), dependency changes, decision language, commits, compaction
+  snapshots, and flushes. 100% recall on the three replay fixtures in
+  `tests/fixtures/sessions/` (synthesized from the hooks reference, not recorded).
+- **Observer (warm path):** a detached, lockfiled worker turns the journal since the last
+  watermark into cited, claim-sized observations with event-level evidence in the story
+  ledger. It is debounced, capped per hour, uses `observer_model` (default: the provider's
+  cheap tier), and runs local-only for confidential repos. Ungrounded or low-confidence
+  claims are dropped.
+- **Reflector (cold path):** SessionEnd spawns it detached (within the ~1.5 s budget), and
+  SessionStart catches up crashed sessions. It merges observations plus code facts for the
+  session's commits into versioned story candidates. Approved stories whose evidence
+  changed get their living artifacts regenerated in place, through the local connector only.
+- **Review inbox:** `skill-forge inbox [show|approve|discard]`, MCP tools
+  `list_story_candidates` / `approve_story` / `discard_story`, and a `/skill-forge-review`
+  command. Nothing is published without approval. SessionStart notifies when candidates
+  wait, and opt-in question mode asks at most one question per session.
+- **Backfill:** `skill-forge backfill --since 30d` replays existing Claude Code transcripts
+  through the same capture path (transcripts keep pre-compaction entries).
+- **Privacy controls:** `skill-forge observe enable|disable [--confidential]`, `observe
+  status|install|uninstall|purge`, a 30-day raw-journal TTL, and `skill-forge forget
+  --session|--repo`.
+- **Claude Code plugin:** the repo root is a plugin (`.claude-plugin/plugin.json` with
+  skill, commands, observer hooks, and MCP server) plus a marketplace entry. Both pass
+  `claude plugin validate --strict`.
+- `scripts/observer-replay.ts`: the replay eval (observer recall vs an end-of-session pass
+  over what survives compaction). It uses live LLM calls, so it isn't run in CI.
+- `SKILL_FORGE_HOME` overrides the config directory (tests, sandboxes, profiles).
+
 ### Phase 3.1 — Code intelligence
 - **`src/codeintel/`**: entity-level structural diff (added / modified / renamed / moved /
   removed, with rename detection by masked body hash and token similarity, and

@@ -1,0 +1,31 @@
+{
+  "name": "memory-leak",
+  "description": "Synthesized from the Claude Code hooks reference (not a recorded session): a goroutine leak is chased, a pool-size tweak is stashed as a dead end, and go test fails twice before the context-cancellation fix passes.",
+  "session_id": "fixture-memory-leak",
+  "gold": {
+    "dead_ends": [{ "detector": "discarded working changes", "keywords": ["pool", "stash"] }],
+    "debug_arcs": [{ "detector": "go test", "keywords": ["goroutine", "context", "cancel"] }],
+    "tradeoffs": [{ "detector": "why not", "keywords": ["heap", "memory limit", "gomemlimit"] }],
+    "dependencies": [],
+    "checkpoints": 1,
+    "snapshots": 0
+  },
+  "payloads": [
+    { "hook_event_name": "SessionStart", "source": "startup" },
+    { "hook_event_name": "UserPromptSubmit", "prompt": "The ingest worker's RSS grows until it gets OOM-killed every ~6 hours. Find the leak." },
+    { "hook_event_name": "PostToolUse", "tool_name": "Bash", "tool_input": { "command": "go tool pprof -top heap.out" }, "tool_response": { "stdout": "flat  flat%  1.2GB 61% runtime.malg" } },
+    { "hook_event_name": "PostToolUse", "tool_name": "Edit", "tool_input": { "file_path": "internal/ingest/pool.go" }, "tool_response": {} },
+    { "hook_event_name": "UserPromptSubmit", "prompt": "Why not just raise the container memory limit and set GOMEMLIMIT?" },
+    { "hook_event_name": "Stop", "last_assistant_message": "That only delays the OOM: pprof shows goroutines piling up in runtime.malg, which is a leak, not a sizing problem." },
+    { "hook_event_name": "PostToolUse", "tool_name": "Bash", "tool_input": { "command": "git stash" }, "tool_response": { "stdout": "Saved working directory and index state WIP on main" } },
+    { "hook_event_name": "PostToolUse", "tool_name": "Edit", "tool_input": { "file_path": "internal/ingest/fetch.go" }, "tool_response": {} },
+    { "hook_event_name": "PostToolUseFailure", "tool_name": "Bash", "tool_input": { "command": "go test ./internal/ingest/..." }, "error": "Exit code 1\n--- FAIL: TestNoGoroutineLeak (2.00s)\n    leaktest: 37 goroutines still running", "is_interrupt": false },
+    { "hook_event_name": "PostToolUse", "tool_name": "Edit", "tool_input": { "file_path": "internal/ingest/fetch.go" }, "tool_response": {} },
+    { "hook_event_name": "PostToolUseFailure", "tool_name": "Bash", "tool_input": { "command": "go test ./internal/ingest/..." }, "error": "Exit code 1\n--- FAIL: TestNoGoroutineLeak (2.00s)\n    leaktest: 3 goroutines still running (ticker not stopped)", "is_interrupt": false },
+    { "hook_event_name": "PostToolUse", "tool_name": "Edit", "tool_input": { "file_path": "internal/ingest/fetch.go" }, "tool_response": {} },
+    { "hook_event_name": "PostToolUse", "tool_name": "Bash", "tool_input": { "command": "go test ./internal/ingest/..." }, "tool_response": { "stdout": "ok  example.com/ingest/internal/ingest 2.41s" } },
+    { "hook_event_name": "Stop", "last_assistant_message": "Fetch goroutines now exit on context cancellation and the retry ticker is stopped; the leak test passes." },
+    { "hook_event_name": "PostToolUse", "tool_name": "Bash", "tool_input": { "command": "git commit -am \"fix: cancel fetch goroutines and stop retry ticker\"" }, "tool_response": { "stdout": "[main c41d7a0] fix: cancel fetch goroutines and stop retry ticker" } },
+    { "hook_event_name": "SessionEnd", "reason": "other" }
+  ]
+}

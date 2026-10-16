@@ -1,5 +1,5 @@
 import { createHash } from "crypto";
-import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync } from "fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync } from "fs";
 import { basename, join } from "path";
 import { ledgerDirFor } from "../config/paths.js";
 import { Evidence, EvidenceSchema } from "../types/evidence.js";
@@ -89,6 +89,14 @@ export class StoryLedger {
     return readJsonl(path).map((raw) => StorySchema.parse(raw));
   }
 
+  /** Delete a story and its version history (used by `forget`). */
+  delete(storyId: string): boolean {
+    const existed = existsSync(this.storyPath(storyId));
+    rmSync(this.storyPath(storyId), { force: true });
+    rmSync(this.historyPath(storyId), { force: true });
+    return existed;
+  }
+
   setStatus(storyId: string, status: StoryStatus, now = new Date().toISOString()): Story {
     const story = this.get(storyId);
     if (!story) throw new Error(`No story "${storyId}" in ledger ${this.dir}`);
@@ -167,6 +175,11 @@ export class StoryLedger {
       mkdirSync(join(this.dir, "observations"), { recursive: true });
       appendFileSync(path, JSON.stringify(obs) + "\n", "utf-8");
     }
+  }
+
+  /** Delete a session's observations (used by `forget`). */
+  removeObservations(sessionId: string): void {
+    rmSync(this.observationsPath(sessionId), { force: true });
   }
 
   listObservations(sessionId?: string): Observation[] {

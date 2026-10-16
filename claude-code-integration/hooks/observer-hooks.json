@@ -1,0 +1,13 @@
+{
+  "hooks": {
+    "SessionStart": [{ "hooks": [{ "type": "command", "command": "skill-forge-observe --host claude-code", "timeout": 5 }] }],
+    "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "skill-forge-observe --host claude-code", "async": true }] }],
+    "PostToolUse": [{ "hooks": [{ "type": "command", "command": "skill-forge-observe --host claude-code", "async": true }] }],
+    "PostToolUseFailure": [{ "hooks": [{ "type": "command", "command": "skill-forge-observe --host claude-code", "async": true }] }],
+    "Stop": [{ "hooks": [{ "type": "command", "command": "skill-forge-observe --host claude-code", "async": true }] }],
+    "SubagentStop": [{ "hooks": [{ "type": "command", "command": "skill-forge-observe --host claude-code", "async": true }] }],
+    "PreCompact": [{ "hooks": [{ "type": "command", "command": "skill-forge-observe --host claude-code", "async": true }] }],
+    "PostCompact": [{ "hooks": [{ "type": "command", "command": "skill-forge-observe --host claude-code", "async": true }] }],
+    "SessionEnd": [{ "hooks": [{ "type": "command", "command": "skill-forge-observe --host claude-code", "timeout": 5 }] }]
+  }
+}

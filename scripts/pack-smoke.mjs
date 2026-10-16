@@ -61,6 +61,21 @@ if (expectLayer && layer !== expectLayer) fail(`expected code intelligence ${exp
 if (layer === "L1" && !/typescript/.test(status)) fail(`L1 active but grammars missing:\n${status}`);
 console.log(`✓ skill-forge codeintel status (${layer})`);
 
+// ── 2c. observer capture bin: must accept any payload and exit 0 ─────────────
+const OBSERVE = (process.env.SF_OBSERVE_BIN ?? "skill-forge-observe").split(" ");
+{
+  const [cmd, ...base] = OBSERVE;
+  const payload = JSON.stringify({ hook_event_name: "UserPromptSubmit", session_id: "pack-smoke", cwd: tmpdir(), prompt: "hi" });
+  const res = spawnSync(cmd, [...base, "--host", "claude-code"], {
+    input: payload,
+    encoding: "utf-8",
+    shell: process.platform === "win32",
+  });
+  if (res.error) fail(`skill-forge-observe: could not spawn (${res.error.message})`);
+  if (res.status !== 0) fail(`skill-forge-observe: exit ${res.status}\n${res.stderr}`);
+  console.log("✓ skill-forge-observe (payload accepted, exit 0)");
+}
+
 // ── 3. MCP tools/list handshake ─────────────────────────────────────────────
 const REQUIRED_TOOL = "generate_skill_forge_artifact";
 const mcpTimeoutMs = 15_000;

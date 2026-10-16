@@ -52,6 +52,11 @@ export interface CalibrationConfig {
   // "claude-sdk" / "openai-agents" pin native Anthropic / OpenAI tool use.
   // See src/orchestrator/subagent/factory.ts.
   subagent_runtime?: SubagentRuntimeSelection;
+  // Observer (v3 Pillar B). The warm-path observer and the reflector use
+  // `observer_model` on the configured provider (default: its cheap tier).
+  // Confidential repos always use a local Ollama model (`observer_local_model`).
+  observer_model?: string;
+  observer_local_model?: string;
 }
 
 export type FocusEffort = "low" | "medium" | "off";

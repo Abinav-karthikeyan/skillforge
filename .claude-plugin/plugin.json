@@ -1,0 +1,28 @@
+{
+  "name": "skill-forge",
+  "displayName": "skill-forge",
+  "version": "0.2.0",
+  "description": "Turn coding sessions into interview-ready stories, resume bullets, and technical deep-dives — with an opt-in always-on observer that captures dead ends and tradeoffs as they happen.",
+  "author": {
+    "name": "Abinav Karthikeyan"
+  },
+  "homepage": "https://github.com/Abinav-karthikeyan/skillforge#readme",
+  "repository": "https://github.com/Abinav-karthikeyan/skillforge",
+  "license": "MIT",
+  "keywords": [
+    "career",
+    "interview",
+    "resume",
+    "observer",
+    "mcp"
+  ],
+  "commands": [
+    "./claude-code-integration/commands/"
+  ],
+  "hooks": "./claude-code-integration/hooks/observer-hooks.json",
+  "mcpServers": {
+    "skill-forge": {
+      "command": "skill-forge-mcp"
+    }
+  }
+}
