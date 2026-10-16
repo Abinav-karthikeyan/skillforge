@@ -41,6 +41,25 @@ import { agentTraceStorePath, readAgentTraces, storeAgentTraces } from "./codein
 import { homedir } from "os";
 import { runDiscovery } from "./discovery/scouts.js";
 import { buildDiscoveryQueries } from "./discovery/queries.js";
+import { GitHubClient } from "./discovery/providers.js";
+import { DiscoveryCache } from "./discovery/net.js";
+import { contributionScout, skillProfile } from "./discovery/career.js";
+import { tailorToJob } from "./tailor/index.js";
+import { runWeeklyDigest } from "./digest/weekly.js";
+import { cronLine, installSchedule, routinePrompt, ScheduleOptions, schtasksArgs, validateSchedule } from "./digest/schedule.js";
+import { createConnector } from "./output/connectors/factory.js";
+import { SessionSummary } from "./types/session.js";
+
+/** A minimal SessionSummary for composite artifacts saved through connectors. */
+function digestSessionFor(oneLiner: string): SessionSummary {
+  const now = new Date().toISOString();
+  return {
+    session_id: `composite-${now.slice(0, 19).replace(/[:T]/g, "-")}`,
+    timestamp: now,
+    source_tool: "skill-forge",
+    summary: { one_liner: oneLiner, problem_statement: "", approach: "", tradeoffs: [], dead_ends: [], technologies: [], patterns_used: [] },
+  };
+}
 import {
   buildRepoGraph,
   buildStructuralDigest,
@@ -766,6 +785,111 @@ program
       if (result.skipped) console.log(`skipped: ${result.skipped}`);
       for (const n of result.notes) console.log(`- ${n}`);
       console.log(JSON.stringify(result.evidence, null, 2));
+    } catch (err) {
+      fail(err);
+    }
+  });
+
+// ── compounding: tailoring, contributions, digest ──────────────────────────
+function githubFor(config: CalibrationConfig, enabled: boolean): GitHubClient | null {
+  return enabled ? new GitHubClient({ token: config.github_token ?? process.env.GITHUB_TOKEN, cache: new DiscoveryCache() }) : null;
+}
+
+program
+  .command("tailor")
+  .description("Tailor your story bank to a job description: stories to lead with, coverage, gaps with study targets")
+  .requiredOption("--jd <path>", "Job description text file ('-' for stdin)")
+  .option("--top <n>", "Stories to lead with", "5")
+  .option("--generate", "Also render tailored artifacts for the top stories (to <artifacts>/tailored/<role>/)")
+  .option("-m, --mode <mode>", "Mode(s) for --generate", "interview-qa")
+  .option("--no-study", "Skip GitHub study targets for gaps (no network)")
+  .option("--save", "Save the report as an artifact through the configured connector")
+  .action(async (opts) => {
+    try {
+      const config = loadCalibration();
+      const jdText = opts.jd === "-" ? readFileSync(0, "utf-8") : readFileSync(opts.jd, "utf-8");
+      const client = clientFor(config);
+      const result = await tailorToJob(jdText, {
+        config,
+        client,
+        github: githubFor(config, opts.study),
+        top: Number(opts.top) || 5,
+        generate: opts.generate ? resolveModes(opts.mode) : undefined,
+      });
+      console.log(result.markdown);
+      for (const g of result.generated) console.log(`✓ tailored: ${g}`);
+      if (opts.save) {
+        const session = { ...digestSessionFor(`Tailoring for ${result.jd.role || "a job description"}`), source_tool: "skill-forge-tailor" };
+        const location = await createConnector(config).write(
+          { mode: "jd-tailoring", session_id: session.session_id, timestamp: new Date().toISOString(), content: result.markdown },
+          session
+        );
+        console.log(`✓ saved: ${location}`);
+      }
+    } catch (err) {
+      fail(err);
+    }
+  });
+
+program
+  .command("contribute")
+  .description("Find open-source issues that match the skills your stories demonstrate (a list for you; nothing is filed)")
+  .option("--limit <n>", "How many", "10")
+  .action(async (opts) => {
+    try {
+      const config = loadCalibration();
+      const dir = resolveArtifactsDir(config.output_dir);
+      const stories = loadAllStories(dir, StoryLedger.forArtifactsDir(dir));
+      const profile = skillProfile(stories);
+      console.log(`Demonstrated: ${[...profile.languages, ...profile.libraries].slice(0, 8).map((s) => `${s.skill} (${s.stories})`).join(", ") || "nothing yet — generate some stories first"}`);
+      const targets = await contributionScout(stories, githubFor(config, true)!, { limit: Number(opts.limit) || 10 });
+      if (targets.length === 0) console.log("No matching open issues found right now.");
+      for (const t of targets) {
+        console.log(`- ${t.repo} (★${t.repo_stars}, ${t.repo_license}) — ${t.title}`);
+        console.log(`  ${t.issue_url}  [${t.matched_skills.join(", ")}${t.labels.length ? `; ${t.labels.join(", ")}` : ""}]`);
+      }
+    } catch (err) {
+      fail(err);
+    }
+  });
+
+const digestCmd = program
+  .command("digest")
+  .description("Weekly brag-doc digest from your stories and commits (the reflector's schedule)")
+  .option("--since <duration>", "Window (e.g. 7d, 2w)", "7d")
+  .option("-c, --connector <name>", "Deliver through this connector (return_only hands it to the host)")
+  .option("--no-reflect", "Skip the reflection catch-up")
+  .action(async (opts) => {
+    try {
+      const config = loadCalibration();
+      const days = parseDuration(opts.since) / 86_400_000;
+      const r = await runWeeklyDigest(days, { config, client: clientFor(config), connector: opts.connector, reflect: opts.reflect });
+      console.log(r.printed);
+    } catch (err) {
+      fail(err);
+    }
+  });
+
+digestCmd
+  .command("schedule")
+  .description("Print (or --install) a weekly schedule: cron / Task Scheduler, or a Claude Code routine prompt")
+  .option("--day <day>", "MON..SUN", "MON")
+  .option("--time <HH:MM>", "24h time", "09:00")
+  .option("-c, --connector <name>", "Connector for the OS schedule (local, gist, notion)", "local")
+  .option("--install", "Install the OS schedule (edits your crontab / Windows Task Scheduler)")
+  .action((opts) => {
+    try {
+      const o = { day: String(opts.day).toUpperCase() as ScheduleOptions["day"], time: opts.time, connector: opts.connector, sinceDays: 7 };
+      validateSchedule(o);
+      if (opts.install) {
+        console.log(`✓ ${installSchedule(o)}`);
+        return;
+      }
+      console.log("OS schedule (writes through a connector that needs no host):");
+      console.log(process.platform === "win32" ? `  schtasks ${schtasksArgs(o).map((a) => (/\s/.test(a) ? `"${a}"` : a)).join(" ")}` : `  ${cronLine(o)}`);
+      console.log("  (or run this command with --install)\n");
+      console.log("Claude Code routine / scheduled agent (delivers with the agent's own connectors):");
+      console.log(`  ${routinePrompt(o)}`);
     } catch (err) {
       fail(err);
     }

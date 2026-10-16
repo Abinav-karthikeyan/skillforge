@@ -34,6 +34,8 @@ const MODE_TITLES: Record<TranslationMode, string> = {
   "interview-qa": "Interview Q&A",
   "portfolio-bullet": "Portfolio Bullets",
   "technical-deep-dive": "Technical Deep-Dive",
+  "jd-tailoring": "Job Tailoring",
+  "weekly-digest": "Weekly Digest",
 };
 
 describe("renderMarkdown", () => {

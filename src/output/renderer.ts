@@ -4,6 +4,8 @@ const MODE_TITLES: Record<string, string> = {
   "interview-qa": "Interview Q&A",
   "portfolio-bullet": "Portfolio Bullets",
   "technical-deep-dive": "Technical Deep-Dive",
+  "jd-tailoring": "Job Tailoring",
+  "weekly-digest": "Weekly Digest",
 };
 
 function buildFrontmatter(output: TranslatorOutput, session: SessionSummary): string {

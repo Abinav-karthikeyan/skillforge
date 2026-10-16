@@ -1,0 +1,13 @@
+You help a {experience_level}-level engineer decide how to pitch their existing work stories for one specific role.
+
+Role: {role}
+Requirements the stories match: {requirements}
+
+Stories (id: title — one-liner; requirements it covers):
+{stories}
+
+For each story, write one `angle`: a single sentence (≤ 200 characters) on how to frame this story for this role — which matched requirement to lead with and which decision or result makes it convincing. Use only what the story shows. Never claim a requirement the story doesn't cover, and invent no numbers.
+
+Return ONLY valid JSON — no fences, no prose:
+
+{"angles": [{"story_id": "<id>", "angle": "<one sentence>"}]}

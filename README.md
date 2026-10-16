@@ -402,6 +402,44 @@ github_token: ${GITHUB_TOKEN}   # optional: higher GitHub rate limits in direct 
 
 ---
 
+## Job tailoring, contributions & the weekly digest
+
+Once the ledger has stories, it can be pointed at a goal.
+
+**Tailor to a job description.** Paste a JD and get back the stories to lead with, which requirements they cover, and what is missing. Each missing requirement comes with the nearest skill your stories *do* show, plus well-maintained open-source repos to study:
+
+```bash
+skill-forge tailor --jd job.txt                 # or: pbpaste | skill-forge tailor --jd -
+skill-forge tailor --jd job.txt --generate -m interview-qa,portfolio-bullet   # also render tailored artifacts
+skill-forge tailor --jd job.txt --no-study      # no network: skip the study targets
+```
+
+```
+# Tailoring: Senior Backend Engineer (senior)
+Must-have coverage: **4/7** · nice-to-have: 1/2 · stories considered: 5
+## Stories to lead with
+## Gaps and how to close them
+- **Kafka** — nearest evidence you have: SQS (1 story)
+  - Study: [apache/kafka](https://github.com/apache/kafka) · ★29,000 · Apache-2.0
+```
+
+The JD is parsed by the model when one is configured, otherwise by keywords. Skills are canonicalized through a small taxonomy, so `k8s` matches Kubernetes, `Postgres` matches PostgreSQL, and "go with webhooks" does not count as Go. Only what a story actually did counts: an alternative it rejected is not experience. Tailored artifacts go to `<artifacts>/tailored/<role>/` and never overwrite your base stories. `--save` stores the report through your connector.
+
+**Find contributions.** `skill-forge contribute` reads the languages and libraries your stories show and returns open, unassigned `good first issue` / `help wanted` issues from licensed, active, non-archived repositories. You get a list to read; nothing is filed or commented on your behalf. Issue titles are untrusted and are sanitized before display.
+
+**Weekly digest.** `skill-forge digest` (default `--since 7d`) catches up the reflector, collects the week's stories and the structural facts of your enabled repositories' commits, and writes a brag-doc entry. Numbers come only from those facts. Use `--connector return_only` to have the host deliver it (Slack, Notion, Docs). Without a model it falls back to a deterministic list.
+
+```bash
+skill-forge digest schedule --day FRI --time 17:00           # prints a cron line / schtasks command / Claude Code routine prompt
+skill-forge digest schedule --day FRI --time 17:00 --install # installs it (crontab, or Windows Task Scheduler)
+```
+
+`--install` is idempotent: it replaces its own tagged crontab line and leaves your other entries alone.
+
+MCP: `tailor_to_job`, `find_contributions`, and `weekly_digest` (which defaults to `return_only`).
+
+---
+
 ## Code intelligence (optional companion)
 
 Every git-path run computes **code facts**: deterministic, LLM-free measurements of the change that the translators must take every number from. Without anything extra you get git-level facts (**L0**: files, lines, symbols named in hunk headers, a feature/refactor/fix/test/config/docs classification). Install the companion for structural facts (**L1**):
@@ -551,6 +589,12 @@ skill-forge stories                  # list stories (ledger + legacy index.yml a
 skill-forge stories show <id>        # one story as JSON
 skill-forge stories migrate          # persist legacy artifacts as one-version stories
 skill-forge stories approve <id>     # or: discard <id>
+
+# Compounding: aim the ledger at a goal
+skill-forge tailor --jd job.txt [--top 5] [--generate -m <modes>] [--no-study] [--save]
+skill-forge contribute [--limit 10]
+skill-forge digest [--since 7d] [--connector return_only] [--no-reflect]
+skill-forge digest schedule [--day MON] [--time 09:00] [--connector local] [--install]
 
 # Hook entry point (reads the hook payload on stdin; always exits 0)
 skill-forge hook post-commit --mode portfolio-bullet

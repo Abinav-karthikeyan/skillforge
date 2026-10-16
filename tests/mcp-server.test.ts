@@ -30,6 +30,10 @@ const EXPECTED_TOOLS = [
   "discard_story",
   // v3 discovery (host mode)
   "plan_prior_art_search",
+  // v3 compounding
+  "tailor_to_job",
+  "weekly_digest",
+  "find_contributions",
   // Deprecated aliases kept for one release (see src/config/paths.ts migration window)
   "generate_career_artifact",
   "list_career_artifacts",

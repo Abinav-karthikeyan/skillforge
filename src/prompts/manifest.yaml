@@ -70,6 +70,27 @@ calibration:
       notes: "Calibration scout (v3 Pillar C): session solution vs quarantined prior-art summaries → verdict, canonical patterns, cited note"
       tuned_against: "deepseek-chat"
 
+jd:
+  active: v1
+  versions:
+    v1:
+      notes: "JD parser (v3 Phase 3.5): job description (fenced as data) → role, seniority, must/nice-to-have, responsibilities, interview focus"
+      tuned_against: "deepseek-chat"
+
+tailor-angles:
+  active: v1
+  versions:
+    v1:
+      notes: "JD tailoring (v3 Phase 3.5): one framing sentence per matched story, grounded in what it covers"
+      tuned_against: "deepseek-chat"
+
+digest:
+  active: v1
+  versions:
+    v1:
+      notes: "Weekly digest (v3 Phase 3.5): the week's stories + code facts → brag-doc markdown, numbers only from facts"
+      tuned_against: "deepseek-chat"
+
 judge:
   active: v1
   versions:

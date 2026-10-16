@@ -57,7 +57,11 @@ export type TradeoffEntry = z.infer<typeof TradeoffSchema>;
 export type TranslationMode =
   | "interview-qa"
   | "portfolio-bullet"
-  | "technical-deep-dive";
+  | "technical-deep-dive"
+  // Composite artifacts (v3 Phase 3.5): not translator modes, but they travel
+  // through the same connectors and index.
+  | "jd-tailoring"
+  | "weekly-digest";
 
 export interface TranslatorOutput {
   mode: TranslationMode;

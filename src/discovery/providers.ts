@@ -140,6 +140,29 @@ export interface RepoInfo {
   topics: string[];
 }
 
+export interface IssueInfo {
+  repo: string;
+  url: string;
+  /** Untrusted text: sanitize before display. */
+  title: string;
+  labels: string[];
+  updated_at: string;
+  comments: number;
+  assigned: boolean;
+}
+
+interface GhIssue {
+  repository_url?: string;
+  html_url?: string;
+  title?: string;
+  labels?: Array<string | { name?: string }>;
+  updated_at?: string;
+  comments?: number;
+  assignee?: unknown;
+  assignees?: unknown[];
+  pull_request?: unknown;
+}
+
 interface GhRepo {
   full_name: string;
   description?: string | null;
@@ -202,6 +225,25 @@ export class GitHubClient {
       this.search
     );
     return (r.items ?? []).map(toRepoInfo);
+  }
+
+  async searchIssues(query: string, limit = 20): Promise<IssueInfo[]> {
+    const r = await this.get<{ items?: GhIssue[] }>(
+      `/search/issues?q=${encodeURIComponent(query)}&sort=updated&order=desc&per_page=${limit}`,
+      this.search
+    );
+    return (r.items ?? [])
+      .filter((i) => !i.pull_request)
+      .map((i) => ({
+        repo: (i.repository_url ?? "").replace(/^https:\/\/api\.github\.com\/repos\//, ""),
+        url: i.html_url ?? "",
+        title: i.title ?? "",
+        labels: (i.labels ?? []).map((l) => (typeof l === "string" ? l : l.name ?? "")).filter(Boolean),
+        updated_at: i.updated_at ?? "",
+        comments: i.comments ?? 0,
+        assigned: Boolean(i.assignee) || (i.assignees?.length ?? 0) > 0,
+      }))
+      .filter((i) => /^[\w.-]+\/[\w.-]+$/.test(i.repo) && i.url.startsWith("https://github.com/"));
   }
 
   async repoInfo(repo: string): Promise<RepoInfo> {

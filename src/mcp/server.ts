@@ -22,6 +22,13 @@ import { approveStory, discardStory, listCandidates } from "../observer/inbox.js
 import { projectStory } from "../types/ledger.js";
 import { buildDiscoveryQueries } from "../discovery/queries.js";
 import { loadObserveSettings, repoPolicy } from "../observer/settings.js";
+import { tailorToJob } from "../tailor/index.js";
+import { runWeeklyDigest } from "../digest/weekly.js";
+import { contributionScout } from "../discovery/career.js";
+import { GitHubClient } from "../discovery/providers.js";
+import { DiscoveryCache } from "../discovery/net.js";
+import { loadAllStories } from "../ledger/migrate.js";
+import type { CalibrationConfig as CalibrationConfigT } from "../types/config.js";
 
 function parseFrontmatterArray(markdown: string, key: string): string[] {
   const match = markdown.match(new RegExp(`^${key}:\\s*\\[(.*)\\]`, "m"));
@@ -483,6 +490,98 @@ server.registerTool(
         "```",
         "Artifacts will cite these inline and list them under Sources.",
       ].join("\n");
+      return { content: [{ type: "text", text }] };
+    } catch (err) {
+      return errorResult(err);
+    }
+  }
+);
+
+// ── compounding (v3 Phase 3.5) ──────────────────────────────────────────────
+
+const mainClient = (config: CalibrationConfigT) =>
+  createClient({ provider: config.provider, model: config.model, base_url: config.base_url, api_key: config.api_key } as ProviderConfig);
+const githubClient = (config: CalibrationConfigT) =>
+  new GitHubClient({ token: config.github_token ?? process.env.GITHUB_TOKEN, cache: new DiscoveryCache() });
+
+server.registerTool(
+  "tailor_to_job",
+  {
+    title: "Tailor stories to a job description",
+    description:
+      "Match the user's story bank against a job description: which stories to lead with (and how to frame them), " +
+      "coverage of every requirement, and gaps with the nearest adjacent evidence plus repositories to study. " +
+      "Optionally renders tailored artifacts for the top stories.",
+    inputSchema: {
+      job_description: z.string().min(20).describe("The job description text, pasted as-is."),
+      top: z.number().int().min(1).max(10).optional().describe("Stories to lead with (default 5)."),
+      generate_mode: MODE_ENUM.optional().describe("Also render tailored artifacts for the top stories in this mode."),
+      study_targets: z.boolean().optional().describe("Look up GitHub repositories to study for each gap (default true)."),
+      output_dir: z.string().optional().describe("Override the configured artifacts directory."),
+    },
+  },
+  async ({ job_description, top, generate_mode, study_targets, output_dir }) => {
+    try {
+      const config = loadCalibration();
+      if (output_dir) config.output_dir = output_dir;
+      const result = await tailorToJob(job_description, {
+        config,
+        client: mainClient(config),
+        github: study_targets === false ? null : githubClient(config),
+        top,
+        generate: generate_mode ? resolveModes(generate_mode) : undefined,
+      });
+      const generated = result.generated.length ? `\n\nTailored artifacts:\n${result.generated.map((g) => `- ${g}`).join("\n")}` : "";
+      return { content: [{ type: "text", text: result.markdown + generated }] };
+    } catch (err) {
+      return errorResult(err);
+    }
+  }
+);
+
+server.registerTool(
+  "weekly_digest",
+  {
+    title: "Weekly career digest",
+    description:
+      "Write a brag-doc digest of the user's recent stories and commits (reflecting any unreflected observed sessions first). " +
+      "With connector 'return_only' (default here) the rendered markdown comes back for you to deliver with your own connectors.",
+    inputSchema: {
+      since_days: z.number().int().min(1).max(90).optional().describe("Window in days (default 7)."),
+      connector: z.string().optional().describe(`Connector (${listConnectors().join(", ")}). Default: return_only.`),
+    },
+  },
+  async ({ since_days, connector }) => {
+    try {
+      const config = loadCalibration();
+      const r = await runWeeklyDigest(since_days ?? 7, { config, client: mainClient(config), connector: connector ?? RETURN_ONLY });
+      return { content: [{ type: "text", text: r.printed }] };
+    } catch (err) {
+      return errorResult(err);
+    }
+  }
+);
+
+server.registerTool(
+  "find_contributions",
+  {
+    title: "Find open-source contributions",
+    description:
+      "Find open, unassigned 'good first issue' / 'help wanted' issues in healthy, licensed repositories that match the skills " +
+      "the user's stories demonstrate. Present them as options; never comment on or claim an issue on the user's behalf.",
+    inputSchema: {
+      limit: z.number().int().min(1).max(20).optional().describe("How many (default 10)."),
+    },
+  },
+  async ({ limit }) => {
+    try {
+      const config = loadCalibration();
+      const dir = resolveArtifactsDir(config.output_dir);
+      const stories = loadAllStories(dir, StoryLedger.forArtifactsDir(dir));
+      const targets = await contributionScout(stories, githubClient(config), { limit: limit ?? 10 });
+      const text = targets.length
+        ? targets.map((t) => `- ${t.repo} (★${t.repo_stars}, ${t.repo_license}) — ${t.title}\n  ${t.issue_url} [matches ${t.matched_skills.join(", ")}]`).join("\n")
+        : "No matching open issues found right now.";
       return { content: [{ type: "text", text }] };
     } catch (err) {
       return errorResult(err);

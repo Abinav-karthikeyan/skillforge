@@ -8,6 +8,48 @@ back-compatible renames).
 
 Work toward the v3 roadmap in `plan_v3.md`, one phase at a time.
 
+### Phase 3.5 — Compounding: JD tailoring, gap and contribution scouts, weekly digest
+- **Skill taxonomy** (`src/tailor/taxonomy.ts`): about 85 skills with aliases, categories, and
+  related skills. Short and all-caps forms match case-sensitively, so "go with" isn't Go,
+  "rest of" isn't REST, and "Node.js" isn't JavaScript. Adjacency orders a skill's
+  neighbours nearest first: explicit relations, then reverse relations, then the rest of
+  its category.
+- **JD tailoring (v2 Bet 4):** `skill-forge tailor --jd <file|->` and MCP `tailor_to_job`.
+  - The JD is fenced as data and parsed by the model (prompt `jd`). Keyword finds are
+    merged in, injected items are dropped, and the parse falls back to keywords alone
+    when the model is unavailable.
+  - Stories are ranked by must-have and nice-to-have coverage, recency, and approval.
+    Only decisions count as experience, never rejected alternatives.
+  - The report has a coverage table and one framing angle per lead story (prompt
+    `tailor-angles`). Gaps list the nearest skill the ledger does show.
+  - `--generate` renders tailored artifacts into `<artifacts>/tailored/<role>/` without
+    touching base stories.
+- **Gap scout** (`src/discovery/career.ts`): for each gap, licensed, non-archived,
+  non-fork repos with more than 1k stars from GitHub search on the allowlisted
+  `api.github.com`, shown as study targets.
+- **Contribution scout:** `skill-forge contribute` and MCP `find_contributions`.
+  - Searches open, unassigned `good first issue` / `help wanted` issues in your top
+    languages that were updated within 90 days.
+  - Drops archived, unlicensed, assigned, and stale repositories.
+  - Scores by stars, recency, matched libraries, and discussion load.
+  - Titles are sanitized for display. Nothing is filed for you.
+- **Weekly digest (v2 Bet 5):** `skill-forge digest [--since 7d]` and MCP `weekly_digest`
+  (defaults to `return_only`). It catches up the reflector, collects the window's
+  non-discarded stories and the structural facts of each enabled repository's commits,
+  and renders a brag-doc entry (prompt `digest`) as mode `weekly-digest`. A
+  deterministic fallback covers no-model runs.
+- **Schedule:** `skill-forge digest schedule` prints a cron line, a `schtasks` command, and
+  a Claude Code routine prompt. `--install` writes it, idempotently, with a tagged crontab
+  line or a named Windows task. Day, time, and connector are validated before anything
+  reaches a shell.
+- New modes `jd-tailoring` and `weekly-digest` in the renderer and the index.
+- Exit criteria, both tested with a mock model and a fake GitHub
+  (`tests/compounding/compounding.test.ts`):
+  - pasting a JD over the 5-story fixture bank returns the matching stories, 4/7
+    must-have coverage, and gaps (Kafka, Kubernetes, distributed systems) with adjacent
+    evidence and licensed study targets;
+  - a weekly digest over a temp repository is delivered via `return_only`.
+
 ### Phase 3.4 — OSS discovery: prior art and calibration
 - **Prior-art scout** (`src/discovery/`): deterministic retrieval from grep.app (`searchGitHub`),
   GitHub repository search, and DeepWiki (`ask_wiki_question`). Tool and argument names were
