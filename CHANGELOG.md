@@ -42,7 +42,9 @@ Work toward the v3 roadmap in `plan_v3.md`, one phase at a time.
   --session|--repo`.
 - **Claude Code plugin:** the repo root is a plugin (`.claude-plugin/plugin.json` with
   skill, commands, observer hooks, and MCP server) plus a marketplace entry. Both pass
-  `claude plugin validate --strict`.
+  `claude plugin validate --strict`. Plugin hooks run through a bundled shim, so a plugin
+  installed without the npm package is a silent no-op instead of "command not found".
+  Verified that a detached worker outlives the capture process on Windows.
 - `scripts/observer-replay.ts`: the replay eval (observer recall vs an end-of-session pass
   over what survives compaction). It uses live LLM calls, so it isn't run in CI.
 - `SKILL_FORGE_HOME` overrides the config directory (tests, sandboxes, profiles).

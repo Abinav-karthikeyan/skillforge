@@ -1,13 +1,13 @@
 {
   "hooks": {
-    "SessionStart": [{ "hooks": [{ "type": "command", "command": "skill-forge-observe --host claude-code", "timeout": 5 }] }],
-    "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "skill-forge-observe --host claude-code", "async": true }] }],
-    "PostToolUse": [{ "hooks": [{ "type": "command", "command": "skill-forge-observe --host claude-code", "async": true }] }],
-    "PostToolUseFailure": [{ "hooks": [{ "type": "command", "command": "skill-forge-observe --host claude-code", "async": true }] }],
-    "Stop": [{ "hooks": [{ "type": "command", "command": "skill-forge-observe --host claude-code", "async": true }] }],
-    "SubagentStop": [{ "hooks": [{ "type": "command", "command": "skill-forge-observe --host claude-code", "async": true }] }],
-    "PreCompact": [{ "hooks": [{ "type": "command", "command": "skill-forge-observe --host claude-code", "async": true }] }],
-    "PostCompact": [{ "hooks": [{ "type": "command", "command": "skill-forge-observe --host claude-code", "async": true }] }],
-    "SessionEnd": [{ "hooks": [{ "type": "command", "command": "skill-forge-observe --host claude-code", "timeout": 5 }] }]
+    "SessionStart": [{"hooks":[{"type":"command","timeout":5,"command":"node","args":["${CLAUDE_PLUGIN_ROOT}/claude-code-integration/hooks/observe-shim.mjs","--host","claude-code"]}]}],
+    "UserPromptSubmit": [{"hooks":[{"type":"command","async":true,"command":"node","args":["${CLAUDE_PLUGIN_ROOT}/claude-code-integration/hooks/observe-shim.mjs","--host","claude-code"]}]}],
+    "PostToolUse": [{"hooks":[{"type":"command","async":true,"command":"node","args":["${CLAUDE_PLUGIN_ROOT}/claude-code-integration/hooks/observe-shim.mjs","--host","claude-code"]}]}],
+    "PostToolUseFailure": [{"hooks":[{"type":"command","async":true,"command":"node","args":["${CLAUDE_PLUGIN_ROOT}/claude-code-integration/hooks/observe-shim.mjs","--host","claude-code"]}]}],
+    "Stop": [{"hooks":[{"type":"command","async":true,"command":"node","args":["${CLAUDE_PLUGIN_ROOT}/claude-code-integration/hooks/observe-shim.mjs","--host","claude-code"]}]}],
+    "SubagentStop": [{"hooks":[{"type":"command","async":true,"command":"node","args":["${CLAUDE_PLUGIN_ROOT}/claude-code-integration/hooks/observe-shim.mjs","--host","claude-code"]}]}],
+    "PreCompact": [{"hooks":[{"type":"command","async":true,"command":"node","args":["${CLAUDE_PLUGIN_ROOT}/claude-code-integration/hooks/observe-shim.mjs","--host","claude-code"]}]}],
+    "PostCompact": [{"hooks":[{"type":"command","async":true,"command":"node","args":["${CLAUDE_PLUGIN_ROOT}/claude-code-integration/hooks/observe-shim.mjs","--host","claude-code"]}]}],
+    "SessionEnd": [{"hooks":[{"type":"command","timeout":5,"command":"node","args":["${CLAUDE_PLUGIN_ROOT}/claude-code-integration/hooks/observe-shim.mjs","--host","claude-code"]}]}]
   }
 }

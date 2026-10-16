@@ -37,6 +37,29 @@ export function observerHooks(): HooksConfig {
   };
 }
 
+/**
+ * The same hooks for the Claude Code plugin, in exec form through the bundled
+ * shim (claude-code-integration/hooks/observe-shim.mjs): it runs the globally
+ * installed capture bin if there is one and is a silent no-op otherwise, so a
+ * plugin without the npm package never surfaces "command not found".
+ */
+export const PLUGIN_SHIM = "${CLAUDE_PLUGIN_ROOT}/claude-code-integration/hooks/observe-shim.mjs";
+
+export function pluginObserverHooks(): HooksConfig {
+  const out: HooksConfig = {};
+  for (const [event, groups] of Object.entries(observerHooks())) {
+    out[event] = groups.map((g) => ({
+      ...g,
+      hooks: g.hooks.map(({ command: _command, ...rest }) => ({
+        ...rest,
+        command: "node",
+        args: [PLUGIN_SHIM, "--host", "claude-code"],
+      })),
+    }));
+  }
+  return out;
+}
+
 export function claudeSettingsPath(scope: "user" | "project", projectDir = process.cwd()): string {
   return scope === "user" ? join(homedir(), ".claude", "settings.json") : join(projectDir, ".claude", "settings.json");
 }

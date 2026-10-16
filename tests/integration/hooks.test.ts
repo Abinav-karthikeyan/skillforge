@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "fs";
-import { observerHooks } from "../../src/observer/install.js";
+import { observerHooks, pluginObserverHooks } from "../../src/observer/install.js";
 import { join } from "path";
 import { describe, expect, it } from "vitest";
 import { parseHookPayload, runPostCommitHook, shouldProcess } from "../../src/hooks/post-commit.js";
@@ -70,8 +70,12 @@ describe("Claude Code plugin packaging", () => {
     expect(plugin.mcpServers["skill-forge"].command).toBe("skill-forge-mcp");
   });
 
-  it("ships exactly the observer hooks `skill-forge observe install` writes", () => {
-    expect(read(...plugin.hooks.split("/").slice(1))).toEqual({ hooks: observerHooks() });
+  it("ships the observer hooks through the no-op-safe shim", () => {
+    expect(read(...plugin.hooks.split("/").slice(1))).toEqual({ hooks: pluginObserverHooks() });
+    // Same events and async/sync split as `skill-forge observe install`.
+    const strip = (h: object) => JSON.parse(JSON.stringify(h, (k, v) => (k === "command" || k === "args" ? undefined : v)));
+    expect(strip(pluginObserverHooks())).toEqual(strip(observerHooks()));
+    expect(existsSync(join(root, "claude-code-integration", "hooks", "observe-shim.mjs"))).toBe(true);
   });
 
   it("lists itself in the repo marketplace", () => {
