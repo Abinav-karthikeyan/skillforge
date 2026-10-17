@@ -286,6 +286,21 @@ describe("backfill from Claude Code transcripts", () => {
     }
   });
 
+  it("files a session that moved into an enabled repo under that repo, not its first cwd", () => {
+    const root = mkdtempSync(join(tmpdir(), "sf-transcripts-"));
+    try {
+      writeTranscript(root, box.repo.root, "moved");
+      const file = join(root, "C--proj", "moved.jsonl");
+      const scratch = JSON.stringify({ sessionId: "moved", cwd: join(tmpdir(), "scratch"), timestamp: "2026-10-01T09:59:00Z", type: "user", message: { role: "user", content: "Plan the work" } });
+      writeFileSync(file, `${scratch}\n${readFileSync(file, "utf-8")}`);
+      const r = backfillTranscripts({ sinceMs: 0, settings: box.settings, journal: box.journal, transcriptsRoot: root });
+      // 9 = the 8 events above plus the opening prompt that led into the repo.
+      expect(r.imported).toEqual([{ session: "moved", repo: box.repo.root, events: 9 }]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("parses durations", () => {
     expect(parseDuration("30d")).toBe(30 * 86_400_000);
     expect(parseDuration("12h")).toBe(12 * 3_600_000);

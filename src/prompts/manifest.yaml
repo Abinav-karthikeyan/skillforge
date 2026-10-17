@@ -43,17 +43,23 @@ technical-deepdive:
       tuned_against: "claude-sonnet-4-6"
 
 observer:
-  active: v1
+  active: v2
   versions:
     v1:
       notes: "Warm-path observer (v3 Pillar B): redacted event log slice + detector signals → cited, claim-sized observations"
       tuned_against: "deepseek-chat"
+    v2:
+      notes: "Adds an outcome rule: no release/publish/deploy/merge/push claim without the event that did it (dogfooding caught a 'published 0.3.0' milestone drawn from a version bump)"
+      tuned_against: "deepseek-chat"
 
 reflector:
-  active: v1
+  active: v2
   versions:
     v1:
       notes: "Cold-path reflector (v3 Pillar B): a session's observations + code facts → story title and SessionSummary content"
+      tuned_against: "deepseek-chat"
+    v2:
+      notes: "Same outcome rule as observer v2: a version bump or a request is not a release; say only what an observation shows happened"
       tuned_against: "deepseek-chat"
 
 quarantine:

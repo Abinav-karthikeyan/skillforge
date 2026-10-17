@@ -198,16 +198,18 @@ export function backfillTranscripts(opts: BackfillOptions): BackfillResult {
       continue;
     }
     const payloads = transcriptToPayloads(lines);
-    const first = payloads[0];
-    if (!first?.session_id || !first.cwd) {
+    if (!payloads.some((p) => p.session_id && p.cwd)) {
       result.skipped.push({ file, reason: "no session id or cwd" });
       continue;
     }
-    const policy = repoPolicy(first.cwd, settings);
-    if (!policy.enabled) {
+    // A session can start in one folder and move into a repository later, so the
+    // session belongs to the first enabled repository it worked in, not to its first cwd.
+    const first = payloads.find((p) => p.session_id && p.cwd && repoPolicy(p.cwd, settings).enabled);
+    if (!first?.session_id || !first.cwd) {
       result.skipped.push({ file, reason: "repository not enabled for observation" });
       continue;
     }
+    const policy = repoPolicy(first.cwd, settings);
     if (journal.exists(first.session_id) && !opts.force) {
       result.skipped.push({ file, reason: "already in the journal" });
       continue;

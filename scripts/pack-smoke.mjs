@@ -32,9 +32,13 @@ function fail(msg) {
   process.exit(1);
 }
 
+// Run from a neutral folder, as a user would. From the repo root the runtime would find the
+// workspace-linked companion through its cwd fallback and report L1 for a core-only install.
+const neutralCwd = mkdtempSync(join(tmpdir(), "sf-smoke-cwd-"));
+
 function runCli(args, label) {
   const [cmd, ...base] = CLI;
-  const res = spawnSync(cmd, [...base, ...args], { encoding: "utf-8", shell: process.platform === "win32" });
+  const res = spawnSync(cmd, [...base, ...args], { encoding: "utf-8", shell: process.platform === "win32", cwd: neutralCwd });
   if (res.error) fail(`${label}: could not spawn "${CLI.join(" ")}" (${res.error.message})`);
   if (res.status !== 0) fail(`${label}: exit ${res.status}\n${res.stderr || res.stdout}`);
   return (res.stdout ?? "") + (res.stderr ?? "");

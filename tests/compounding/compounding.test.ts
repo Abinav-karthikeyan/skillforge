@@ -3,7 +3,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { LLMClient } from "../../src/claude/types.js";
-import { contributionScout, displayTitle, gapScout, skillProfile } from "../../src/discovery/career.js";
+import { contributionScout, displayTitle, gapScout, skillProfile, studyQueries } from "../../src/discovery/career.js";
 import { FetchLike, TokenBucket } from "../../src/discovery/net.js";
 import { GitHubClient } from "../../src/discovery/providers.js";
 import { cronLine, installSchedule, routinePrompt, schtasksArgs, validateSchedule } from "../../src/digest/schedule.js";
@@ -11,7 +11,7 @@ import { fallbackDigest, runWeeklyDigest } from "../../src/digest/weekly.js";
 import { StoryLedger } from "../../src/ledger/store.js";
 import { tailorToJob } from "../../src/tailor/index.js";
 import { parseJobDescription, parseJobDescriptionByKeywords } from "../../src/tailor/jd.js";
-import { adjacentSkills, canonicalName, mentions, skillsIn } from "../../src/tailor/taxonomy.js";
+import { adjacentSkills, canonicalName, canonicalRequirements, mentions, skillsIn } from "../../src/tailor/taxonomy.js";
 import { Story } from "../../src/types/ledger.js";
 import { CalibrationConfig } from "../../src/types/config.js";
 import { DEFAULT_OBSERVE_SETTINGS } from "../../src/observer/settings.js";
@@ -129,6 +129,24 @@ describe("skill taxonomy", () => {
     expect(skillsIn("TypeScript, Node.js and Redis behind Express")).toEqual(expect.arrayContaining(["TypeScript", "Node.js", "Redis", "Express"]));
   });
 
+  it("knows agentic-AI skills and resolves requirement phrases to the skill they name", () => {
+    expect(canonicalRequirements("Model Context Protocol (MCP)")).toEqual(["MCP"]);
+    expect(canonicalRequirements("tool use / function calling")).toEqual(["Tool use"]);
+    expect(canonicalRequirements("LLM agents")).toEqual(["AI agents"]);
+    expect(canonicalRequirements("prompt injection defenses")).toEqual(["Prompt injection defense"]);
+    expect(canonicalRequirements("agent memory and context engineering")).toEqual(["Agent memory", "Context engineering"]);
+    expect(canonicalRequirements("Strong TypeScript or Python")).toEqual(["TypeScript", "Python"]);
+    expect(canonicalRequirements("a bias for action")).toEqual(["a bias for action"]);
+    expect(studyQueries("Kafka")).toEqual(["Kafka in:name,description,topics"]);
+    expect(studyQueries("Vector databases")).toEqual(['"vector databases" in:name,description,topics', "topic:vector-databases", "topic:vector-database"]);
+    expect(mentions("an LLM-as-judge rubric", "LLM evaluation")).toBe(true);
+    expect(mentions("an LLM-as-judge rubric", "LLMs")).toBe(true);
+    expect(mentions("a tool-using subagent scout", "Tool use")).toBe(true);
+    expect(mentions("a tool-using subagent scout", "Multi-agent orchestration")).toBe(true);
+    expect(mentions("the dual-LLM pattern", "Prompt injection defense")).toBe(true);
+    expect(mentions("Thin MCP server wrapper", "MCP")).toBe(true);
+  });
+
   it("orders neighbours nearest first", () => {
     const near = adjacentSkills("Kafka");
     expect(near.slice(0, 4)).toEqual(["Kinesis", "Pulsar", "RabbitMQ", "Redis Streams"]);
@@ -243,9 +261,9 @@ describe("contribution scout", () => {
     expect(profile.libraries.map((l) => l.skill)).toEqual(expect.arrayContaining(["Node.js", "Redis"]));
 
     const fresh = "2026-10-10T00:00:00Z";
-    const issue = (repo: string, title: string, extra: object = {}) => ({
+    const issue = (repo: string, n: number, title: string, extra: object = {}) => ({
       repository_url: `https://api.github.com/repos/${repo}`,
-      html_url: `https://github.com/${repo}/issues/1`,
+      html_url: `https://github.com/${repo}/issues/${n}`,
       title,
       labels: [{ name: "good first issue" }],
       updated_at: fresh,
@@ -254,35 +272,47 @@ describe("contribution scout", () => {
       assignees: [],
       ...extra,
     });
-    const repos: Record<string, object> = {
-      "good/redis-client": { full_name: "good/redis-client", description: "A Redis client for Node.js", stargazers_count: 5000, license: { spdx_id: "MIT" }, pushed_at: fresh, default_branch: "main", topics: ["redis"] },
-      "old/repo": { full_name: "old/repo", stargazers_count: 100, license: { spdx_id: "MIT" }, archived: true, default_branch: "main" },
-      "nolic/repo": { full_name: "nolic/repo", stargazers_count: 100, license: null, default_branch: "main" },
-    };
+    const repo = (full_name: string, stars: number, extra: object = {}) => ({ full_name, stargazers_count: stars, license: { spdx_id: "MIT" }, pushed_at: fresh, default_branch: "main", topics: [], ...extra });
     const urls: string[] = [];
     const github = fakeGitHub((u) => {
-      if (u.pathname === "/search/issues") {
+      const q = u.searchParams.get("q") ?? "";
+      if (u.pathname === "/search/repositories") {
         return {
           items: [
-            issue("good/redis-client", "Add retry ​[option](javascript:alert(1)) <b>for</b> reconnects"),
-            issue("good/redis-client", "Assigned already", { html_url: "https://github.com/good/redis-client/issues/2", assignee: { login: "x" } }),
-            issue("good/redis-client", "Very old", { html_url: "https://github.com/good/redis-client/issues/3", updated_at: "2025-01-01T00:00:00Z" }),
-            issue("old/repo", "Archived repo issue"),
-            issue("nolic/repo", "Unlicensed repo issue"),
-            { ...issue("good/redis-client", "A pull request"), pull_request: {} },
+            repo("good/redis-client", 5000, { description: "A Redis client for Node.js", topics: ["redis"] }),
+            repo("tiny/repo", 20),
+            repo("old/repo", 900, { archived: true }),
+            repo("nolic/repo", 900, { license: null }),
+            repo("fork/repo", 900, { fork: true }),
           ],
         };
       }
-      const m = /^\/repos\/(.+)$/.exec(u.pathname);
-      return m ? repos[m[1]] : undefined;
+      if (u.pathname === "/search/issues") {
+        if (!q.includes("repo:good/redis-client")) return { items: [] };
+        return {
+          items: [
+            issue("good/redis-client", 1, "Add retry ​[option](javascript:alert(1)) <b>for</b> reconnects"),
+            issue("good/redis-client", 2, "Assigned already", { assignee: { login: "x" } }),
+            issue("good/redis-client", 3, "Very old", { updated_at: "2025-01-01T00:00:00Z" }),
+            { ...issue("good/redis-client", 4, "A pull request"), pull_request: {} },
+            issue("good/redis-client", 5, "Document the cluster options"),
+            issue("good/redis-client", 6, "A third good issue from the same repo"),
+          ],
+        };
+      }
+      return undefined;
     }, urls);
 
     const targets = await contributionScout(stories, github, { now });
-    expect(targets).toHaveLength(1);
+    // At most two issues per repository, and only from the healthy one.
+    expect(targets.map((t) => t.issue_url)).toEqual(["https://github.com/good/redis-client/issues/1", "https://github.com/good/redis-client/issues/5"]);
     expect(targets[0]).toMatchObject({ repo: "good/redis-client", repo_license: "MIT", repo_stars: 5000 });
     expect(targets[0].matched_skills).toEqual(expect.arrayContaining(["TypeScript", "Redis", "Node.js"]));
     expect(targets[0].title).toBe("Add retry optionjavascript:alert1 for reconnects");
-    expect(urls.some((u) => u.includes("/search/issues") && decodeURIComponent(u).includes('label:"good first issue"'))).toBe(true);
+    const decoded = urls.map((u) => decodeURIComponent(u));
+    expect(decoded.some((u) => u.includes("/search/repositories") && u.includes("good-first-issues:>") && u.includes("topic:"))).toBe(true);
+    expect(decoded.some((u) => u.includes("/search/issues") && u.includes("repo:good/redis-client") && u.includes('label:"good first issue"'))).toBe(true);
+    for (const skipped of ["tiny/repo", "old/repo", "nolic/repo", "fork/repo"]) expect(decoded.some((u) => u.includes(`repo:${skipped}`))).toBe(false);
     expect(urls.every((u) => u.startsWith("https://api.github.com/"))).toBe(true);
   });
 

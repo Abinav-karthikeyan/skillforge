@@ -4,7 +4,7 @@ import { LLMClient } from "../claude/types.js";
 import { looksInjected, sanitizeUntrusted } from "../discovery/sanitize.js";
 import { safeJson } from "../observer/llm.js";
 import { interpolate, loadPrompt } from "../translators/base.js";
-import { canonicalName, skillsIn } from "./taxonomy.js";
+import { canonicalRequirements, skillsIn } from "./taxonomy.js";
 
 /**
  * Job-description parsing (v2 Bet 4 → plan_v3 Phase 3.5). An LLM extracts the
@@ -31,7 +31,7 @@ export const JobDescriptionSchema = z.object({
 export type JobDescription = z.infer<typeof JobDescriptionSchema> & { source: "llm" | "keywords" };
 
 const clean = (items: string[], max: number) =>
-  [...new Set(items.map((s) => canonicalName(s.replace(/\s+/g, " ").trim())).filter((s) => s.length > 1 && s.length <= 60 && !looksInjected(s)))].slice(0, max);
+  [...new Set(items.flatMap((s) => canonicalRequirements(s.replace(/\s+/g, " ").trim())).filter((s) => s.length > 1 && s.length <= 60 && !looksInjected(s)))].slice(0, max);
 
 /** Deterministic extraction: known skills, split into required vs preferred by section cues. */
 export function parseJobDescriptionByKeywords(jd: string): JobDescription {
@@ -56,12 +56,12 @@ export async function parseJobDescription(jd: string, client?: LLMClient): Promi
     if (!parsed.success) return fallback;
     const d = parsed.data;
     // Keep anything the keyword pass found that the model missed.
-    const must = clean([...d.must_have, ...fallback.must_have], 15);
+    const must = clean([...d.must_have, ...fallback.must_have], 25);
     return {
       role: d.role.slice(0, 80) || fallback.role,
       seniority: d.seniority === "unknown" ? fallback.seniority : d.seniority,
       must_have: must,
-      nice_to_have: clean([...d.nice_to_have, ...fallback.nice_to_have], 10).filter((s) => !must.includes(s)),
+      nice_to_have: clean([...d.nice_to_have, ...fallback.nice_to_have], 15).filter((s) => !must.includes(s)),
       responsibilities: clean(d.responsibilities, 6),
       interview_focus: d.interview_focus,
       source: "llm",

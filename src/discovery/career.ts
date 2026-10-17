@@ -1,7 +1,7 @@
 import { Story } from "../types/ledger.js";
 import { Gap, storySkills } from "../tailor/match.js";
 import { lookupSkill } from "../tailor/taxonomy.js";
-import { GitHubClient, RepoInfo } from "./providers.js";
+import { GitHubClient, IssueInfo, RepoInfo } from "./providers.js";
 import { sanitizeUntrusted } from "./sanitize.js";
 
 /**
@@ -41,19 +41,38 @@ export async function gapScout(
       out.push({ ...gap, study: [] });
       continue;
     }
-    let repos: RepoInfo[] = [];
-    try {
-      repos = await github.searchRepos(`${gap.requirement} in:name,description,topics stars:>1000 archived:false fork:false`, 10);
-    } catch {
-      repos = [];
+    const perGap = opts.perGap ?? 3;
+    const found = new Map<string, RepoInfo>();
+    for (const query of studyQueries(gap.requirement)) {
+      if (found.size >= perGap) break;
+      try {
+        for (const r of await github.searchRepos(`${query} stars:>1000 archived:false fork:false`, 10)) {
+          if (!r.archived && !r.fork && r.license && !found.has(r.repo)) found.set(r.repo, r);
+        }
+      } catch {
+        // A failed search leaves fewer study targets, never an error.
+      }
     }
-    const study = repos
-      .filter((r) => !r.archived && !r.fork && r.license)
-      .slice(0, opts.perGap ?? 3)
+    const study = [...found.values()]
+      .sort((a, b) => b.stars - a.stars)
+      .slice(0, perGap)
       .map((r) => ({ repo: r.repo, url: `https://github.com/${r.repo}`, stars: r.stars, license: r.license, pushed_at: r.pushed_at }));
     out.push({ ...gap, study });
   }
   return out;
+}
+
+/**
+ * Searches for one gap, most precise first. A multi-word skill is quoted
+ * (unquoted, GitHub matches each word anywhere, so "AI safety" finds email
+ * clients), then tried as topic slugs, which owners curate ("vector-database").
+ */
+export function studyQueries(requirement: string): string[] {
+  const words = requirement.replace(/["()]/g, " ").trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (words.length < 2) return [`${requirement} in:name,description,topics`];
+  const slug = words.join("-");
+  const singular = slug.replace(/([^s])s$/, "$1");
+  return [`"${words.join(" ")}" in:name,description,topics`, `topic:${slug}`, ...(singular !== slug ? [`topic:${singular}`] : [])];
 }
 
 // ── contribution scout ─────────────────────────────────────────────────────
@@ -99,10 +118,28 @@ export function displayTitle(raw: string): string {
   return sanitizeUntrusted(raw, 140).replace(/[[\]()<>`*_#|]/g, "").replace(/\s+/g, " ").trim();
 }
 
+/** A GitHub topic slug for a skill: "AI agents" → ai-agents, "Node.js" → nodejs, "C#" → csharp. */
+export function topicSlug(skill: string): string {
+  return skill
+    .toLowerCase()
+    .replace(/\+/g, "plus")
+    .replace(/#/g, "sharp")
+    .replace(/\./g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+/**
+ * Repository first, then issues. Searching issues directly returns whatever was
+ * updated last, which is mostly tiny repositories, so the scout first finds
+ * healthy repositories in the user's languages that have open beginner issues
+ * (GitHub's `good-first-issues:>N` qualifier), library topics first, and then
+ * takes at most two unassigned issues from each.
+ */
 export async function contributionScout(
   stories: Story[],
   github: GitHubClient,
-  opts: { limit?: number; now?: Date } = {}
+  opts: { limit?: number; now?: Date; minStars?: number } = {}
 ): Promise<ContributionTarget[]> {
   const now = opts.now ?? new Date();
   const profile = skillProfile(stories);
@@ -110,58 +147,65 @@ export async function contributionScout(
   const libraries = profile.libraries.slice(0, 6).map((l) => l.skill);
   if (languages.length === 0) return [];
   const since = new Date(now.getTime() - 90 * 86_400_000).toISOString().slice(0, 10);
+  const minStars = opts.minStars ?? 200;
+  const healthy = `pushed:>${since} archived:false fork:false`;
+  const gh = (lang: string) => `language:"${GITHUB_LANGUAGE[lang] ?? lang}"`;
 
-  const issues = [];
-  for (const lang of languages) {
-    for (const label of ['"good first issue"', '"help wanted"']) {
-      const q = `is:issue state:open no:assignee archived:false label:${label} language:"${GITHUB_LANGUAGE[lang] ?? lang}" updated:>${since}`;
-      try {
-        issues.push(...(await github.searchIssues(q, 20)).map((i) => ({ ...i, lang })));
-      } catch {
-        /* rate limited — use what we have */
-      }
-    }
-  }
-
-  // Health data for the most promising repositories.
-  const repos = [...new Set(issues.filter((i) => !i.assigned).map((i) => i.repo))].slice(0, 8);
-  const info = new Map<string, RepoInfo>();
-  for (const repo of repos) {
+  // At most three repository searches and five issue searches: GitHub allows 10 unauthenticated searches a minute.
+  const repoQueries = [
+    ...libraries.slice(0, 2).map((lib) => ({ lang: languages[0], q: `topic:${topicSlug(lib)} ${gh(languages[0])} good-first-issues:>1 stars:>${minStars} ${healthy}` })),
+    { lang: languages[0], q: `${gh(languages[0])} good-first-issues:>3 stars:>${minStars * 5} ${healthy}` },
+  ];
+  const repos = new Map<string, { info: RepoInfo; lang: string }>();
+  for (const { lang, q } of repoQueries) {
+    if (repos.size >= 5) break;
     try {
-      info.set(repo, await github.repoInfo(repo));
+      for (const r of await github.searchRepos(q, 5)) {
+        if (!r.archived && !r.fork && r.license && r.stars >= minStars && !repos.has(r.repo)) repos.set(r.repo, { info: r, lang });
+      }
     } catch {
-      /* skip */
+      /* rate limited — use what we have */
     }
   }
 
   const seen = new Set<string>();
   const targets: ContributionTarget[] = [];
-  for (const issue of issues) {
-    const repo = info.get(issue.repo);
-    if (!repo || repo.archived || !repo.license || issue.assigned || seen.has(issue.url)) continue;
-    const ageDays = (now.getTime() - Date.parse(issue.updated_at)) / 86_400_000;
-    if (!(ageDays <= 180)) continue; // stale
-    seen.add(issue.url);
-    const haystack = `${repo.repo} ${repo.description ?? ""} ${repo.topics.join(" ")} ${issue.title} ${issue.labels.join(" ")}`.toLowerCase();
-    const matched = [issue.lang, ...libraries.filter((l) => haystack.includes(l.toLowerCase()))];
-    const score =
-      Math.log10(repo.stars + 1) +
-      (ageDays < 30 ? 2 : ageDays < 90 ? 1 : 0) +
-      (matched.length - 1) * 2 +
-      (issue.labels.some((l) => /good first issue/i.test(l)) ? 1 : 0) -
-      (issue.comments > 15 ? 2 : 0);
-    targets.push({
-      repo: repo.repo,
-      issue_url: issue.url,
-      title: displayTitle(issue.title),
-      labels: issue.labels.map((l) => displayTitle(l)).slice(0, 5),
-      updated_at: issue.updated_at,
-      comments: issue.comments,
-      matched_skills: [...new Set(matched)],
-      repo_stars: repo.stars,
-      repo_license: repo.license,
-      score: Math.round(score * 100) / 100,
-    });
+  for (const { info: repo, lang } of [...repos.values()].slice(0, 5)) {
+    let issues: IssueInfo[] = [];
+    try {
+      issues = await github.searchIssues(`repo:${repo.repo} is:issue state:open no:assignee label:"good first issue" updated:>${since}`, 5);
+    } catch {
+      continue;
+    }
+    let taken = 0;
+    for (const issue of issues) {
+      if (taken >= 2) break;
+      if (issue.assigned || seen.has(issue.url)) continue;
+      const ageDays = (now.getTime() - Date.parse(issue.updated_at)) / 86_400_000;
+      if (!(ageDays <= 180)) continue; // stale
+      seen.add(issue.url);
+      taken++;
+      const haystack = `${repo.repo} ${repo.description ?? ""} ${repo.topics.join(" ")} ${issue.title} ${issue.labels.join(" ")}`.toLowerCase();
+      const matched = [lang, ...libraries.filter((l) => haystack.includes(l.toLowerCase()) || repo.topics.includes(topicSlug(l)))];
+      const score =
+        Math.log10(repo.stars + 1) +
+        (ageDays < 30 ? 2 : ageDays < 90 ? 1 : 0) +
+        (matched.length - 1) * 2 +
+        (issue.labels.some((l) => /good first issue/i.test(l)) ? 1 : 0) -
+        (issue.comments > 15 ? 2 : 0);
+      targets.push({
+        repo: repo.repo,
+        issue_url: issue.url,
+        title: displayTitle(issue.title),
+        labels: issue.labels.map((l) => displayTitle(l)).slice(0, 5),
+        updated_at: issue.updated_at,
+        comments: issue.comments,
+        matched_skills: [...new Set(matched)],
+        repo_stars: repo.stars,
+        repo_license: repo.license!,
+        score: Math.round(score * 100) / 100,
+      });
+    }
   }
   return targets.sort((a, b) => b.score - a.score).slice(0, opts.limit ?? 10);
 }

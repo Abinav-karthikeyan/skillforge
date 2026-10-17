@@ -9,7 +9,7 @@
  */
 export type SkillCategory =
   | "language" | "frontend" | "backend" | "database" | "cache" | "messaging" | "data"
-  | "ml" | "cloud" | "container" | "iac" | "cicd" | "observability" | "security" | "api" | "testing" | "mobile";
+  | "ml" | "ai" | "cloud" | "container" | "iac" | "cicd" | "observability" | "security" | "api" | "testing" | "mobile";
 
 export interface Skill {
   name: string;
@@ -80,8 +80,24 @@ export const SKILLS: Skill[] = [
   // ml
   { name: "PyTorch", category: "ml", aliases: ["torch"], related: ["TensorFlow", "JAX"] },
   { name: "TensorFlow", category: "ml", related: ["PyTorch"] },
-  { name: "LLMs", category: "ml", aliases: ["llm", "large language models", "generative ai", "genai"], related: ["RAG"] },
-  { name: "RAG", category: "ml", aliases: ["retrieval augmented generation"], related: ["LLMs"] },
+  // Short forms match case-sensitively, so the alias is "LLM" as people write it.
+  { name: "LLMs", category: "ml", aliases: ["LLM", "large language models", "generative ai", "genai"], related: ["RAG"] },
+  { name: "RAG", category: "ml", aliases: ["retrieval augmented generation", "retrieval-augmented generation"], related: ["LLMs", "Vector databases"] },
+  // ai engineering
+  { name: "AI agents", category: "ai", aliases: ["llm agents", "ai agent", "agentic ai", "agentic", "coding agents", "coding agent", "coding-agent", "autonomous agents"], related: ["Tool use", "Multi-agent orchestration", "Agent memory"] },
+  { name: "Tool use", category: "ai", aliases: ["tool calling", "tool-calling", "function calling", "tool-use", "tool-using", "tool loop", "tool calls"], related: ["AI agents", "MCP"] },
+  { name: "Multi-agent orchestration", category: "ai", aliases: ["multi-agent", "multi agent", "subagent", "subagents", "agent orchestration"], related: ["AI agents", "Tool use"] },
+  { name: "Agent memory", category: "ai", aliases: ["long-term memory", "memory tiers", "episodic memory"], related: ["Context engineering", "RAG"] },
+  { name: "Context engineering", category: "ai", aliases: ["context window", "context management", "compaction", "repo map", "prompt engineering"], related: ["Agent memory", "RAG"] },
+  { name: "LLM evaluation", category: "ai", aliases: ["llm evals", "evals", "llm-as-judge", "llm as a judge", "llm as judge", "eval suite", "eval harness", "prompt eval", "prompt evaluation"], related: ["AI safety"] },
+  { name: "Prompt injection defense", category: "ai", aliases: ["prompt injection", "prompt-injection", "prompt injection defenses", "dual-llm pattern", "dual llm pattern", "dual-llm"], related: ["AI safety"] },
+  { name: "AI safety", category: "ai", aliases: ["llm safety", "guardrails", "red teaming", "red-team", "responsible ai"], related: ["Prompt injection defense", "LLM evaluation"] },
+  { name: "MCP", category: "ai", aliases: ["model context protocol", "mcp server", "mcp servers"], related: ["Tool use"] },
+  { name: "Vector databases", category: "ai", aliases: ["vector database", "vector db", "vector store", "vector search", "embeddings", "pgvector", "pinecone", "weaviate", "qdrant", "chroma"], related: ["RAG"] },
+  { name: "LangGraph", category: "ai", related: ["LangChain", "AI agents"] },
+  { name: "LangChain", category: "ai", related: ["LangGraph", "LlamaIndex"] },
+  { name: "LlamaIndex", category: "ai", related: ["LangChain", "RAG"] },
+  { name: "Fine-tuning", category: "ai", aliases: ["fine tuning", "finetuning", "lora", "rlhf"], related: ["PyTorch", "LLMs"] },
   // cloud / containers / iac / cicd
   { name: "AWS", category: "cloud", aliases: ["amazon web services"], related: ["GCP", "Azure"] },
   { name: "GCP", category: "cloud", aliases: ["google cloud"], related: ["AWS", "Azure"] },
@@ -130,6 +146,19 @@ export function lookupSkill(name: string): Skill | undefined {
 
 export function canonicalName(name: string): string {
   return lookupSkill(name)?.name ?? name.trim();
+}
+
+/**
+ * A job requirement as the skills it names: an exact name or alias, else the
+ * known skills inside the phrase ("Model Context Protocol (MCP)" → MCP,
+ * "agent memory and context engineering" → Agent memory, Context engineering).
+ * A phrase naming no known skill stays as written.
+ */
+export function canonicalRequirements(phrase: string): string[] {
+  const exact = lookupSkill(phrase);
+  if (exact) return [exact.name];
+  const inside = skillsIn(phrase);
+  return inside.length ? inside : [phrase.trim()];
 }
 
 /** Every surface form that should count as a mention of `skill`. */
