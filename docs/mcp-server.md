@@ -20,6 +20,13 @@ Use the CLI for scripting and CI. Use the slash command if you're only ever in C
 | `session_summary` | object (optional) | Structured session context — `summary.one_liner`, `problem_statement`, `approach`, `tradeoffs`, `dead_ends`, `technologies`, `patterns_used`, `complexity_signals`. Omit to fall back to summarizing local `git log`/`git diff`. |
 | `output_dir` | string (optional) | Overrides the configured output directory. |
 | `connector` | string (optional) | `local` (default), `gist`, `notion`, or `return_only`. See host-delivery below. |
+| `prompt_version` | string (optional) | Pin a prompt version (e.g. `v2`). |
+| `focus` / `focus_effort` | string or string[] / `low \| medium \| off` (optional) | Interview-qa only: a focus lens and the scout's budget tier. |
+| `range` | string (optional) | Git range for code facts and the git fallback, e.g. `main..HEAD`. Default `HEAD~1..HEAD`. |
+| `with_code_facts` | boolean (optional) | With `session_summary`: attach deterministic code facts for `range`. Artifacts then take every number from them. |
+| `prior_art` | boolean (optional) | Direct discovery for this run: cite how open-source projects solve the same problem. Never runs for confidential repos. |
+
+Set `session_summary.story_id` to update an existing living artifact in place (versioned) instead of adding a new one.
 
 Returns the rendered markdown for each generated mode plus the file path it was written to.
 
@@ -54,6 +61,26 @@ Returns the contents of `index.yml` for the resolved output directory.
 Reads the most recently generated artifact from `index.yml`, uploads it to a GitHub Gist via the Gist API, and returns the shareable URL. Requires `GITHUB_TOKEN` in the environment or `gist_token` in `skill-forge.config.yaml` (needs the `gist` scope, nothing else).
 
 Typical flow in an MCP host: after `generate_skill_forge_artifact` writes a portfolio bullet, ask the host to "share the last artifact" — the URL comes back inline and you can drop it into a resume or a message.
+
+### Observer inbox (v3)
+
+| Tool | Inputs | Does |
+|---|---|---|
+| `list_story_candidates` | `output_dir`? | Lists story candidates drafted by the always-on observer. |
+| `approve_story` | `story_id`, `mode`?, `connector`?, `output_dir`? | Approves a candidate (only on the user's say-so) and, with `mode`, generates its artifacts. Approved stories are living artifacts. |
+| `discard_story` | `story_id`, `output_dir`? | Discards a candidate. |
+
+### Discovery, host mode (v3)
+
+`plan_prior_art_search` takes `session_summary` and returns search queries plus the exact evidence format. The host runs the searches with its own code-search tools and passes the findings back as `session_summary.summary.evidence`. It makes no network calls itself and refuses for confidential repositories.
+
+### Compounding (v3)
+
+| Tool | Inputs | Does |
+|---|---|---|
+| `tailor_to_job` | `job_description`, `top`?, `generate_mode`?, `study_targets`?, `output_dir`? | Stories to lead with and how to frame them, requirement coverage, and gaps with adjacent evidence and GitHub repositories to study. `generate_mode` also renders tailored artifacts. |
+| `weekly_digest` | `since_days`? (default 7), `connector`? (default `return_only`) | This week's brag-doc entry from the story ledger and the commits of enabled repositories. |
+| `find_contributions` | `limit`? (default 10) | Open, unassigned beginner-friendly issues in healthy repositories that match the user's demonstrated skills. Nothing is filed. |
 
 ## Running it
 

@@ -10,6 +10,17 @@ You just spent four hours debugging a race condition, or designed a provider abs
 
 **skill-forge captures session context at peak richness** — right now, while the conversation is still open — and translates it into artifacts you can actually use: STAR-format interview answers, XYZ resume bullets, and technical narratives ready for a portfolio or blog post.
 
+### New in 0.3 (v3)
+
+- **[Always-on observer](#always-on-observer-opt-in).** Hooks in Claude Code, Codex, Gemini CLI, Copilot CLI, Cursor, or plain git capture dead ends and trade-offs as they happen, before compaction drops them. Story candidates wait in a review inbox, and nothing is published without your approval.
+- **Story ledger.** Approved stories are living artifacts: versioned, and updated in place when later sessions add evidence.
+- **[Measured numbers](#code-intelligence-optional-companion).** A structural digest replaces the truncated diff (45% of v2's prompt tokens on this repo, with nothing truncated). Artifacts may only state numbers from deterministic code facts.
+- **Judge.** `skill-forge judge` scores STAR completeness, specificity, groundedness, metric honesty, and calibration.
+- **[Prior art](#prior-art--calibration-opt-in-discovery).** Optional, cited comparisons with licensed open-source projects, plus a calibration note.
+- **[Job tailoring, contributions, weekly digest](#job-tailoring-contributions--the-weekly-digest).** Point your story bank at a goal.
+
+Full list in the [CHANGELOG](CHANGELOG.md).
+
 ---
 
 ## "Couldn't you just write a skill for this?"
@@ -25,7 +36,7 @@ The slash command (`/skill-forge`) is the lowest-friction entry point. It is not
 
 ## How it works
 
-A single pipeline — `ingestor → translators → output` — exposed four ways:
+A single pipeline — `ingestor → translators → output` — exposed five ways:
 
 | Surface | When you'd use it | Context source |
 |---|---|---|
@@ -33,8 +44,9 @@ A single pipeline — `ingestor → translators → output` — exposed four way
 | **MCP server** (`skill-forge-mcp`) | Any MCP-capable host: Claude Desktop, custom tooling | Tool call args (`session_summary`), or git fallback |
 | **CLI** (`skill-forge generate`) | Scripts, CI, or piping a git diff | `--json` file, or local git log/diff |
 | **git commit hook** | Every commit, zero extra steps | git log + diff — no session required |
+| **Always-on observer** (`skill-forge-observe`, v3) | Every session in a repository you've enabled | Agent hook events, redacted and journaled as they happen, then drafted into story candidates for review |
 
-All four surfaces feed the same pipeline. The `/skill-forge` slash command produces the richest output because it has the full conversation; the git hook produces the leanest because it works purely from diff context. Same typed contract at the output end either way.
+All five surfaces feed the same pipeline. The `/skill-forge` slash command produces the richest output because it has the full conversation; the git hook produces the leanest because it works purely from diff context. Same typed contract at the output end either way.
 
 ---
 
@@ -71,6 +83,7 @@ This typed contract is what makes translators swappable. Adding a new output mod
 
 ```bash
 npm install -g @abhinavravich1999/skill-forge
+npm install -g @abhinavravich1999/skill-forge-codeintel   # optional: structural code facts (L1)
 ```
 
 Or run without installing:
@@ -85,8 +98,11 @@ npx @abhinavravich1999/skill-forge generate --help
 > works, and the old MCP tool names (`generate_career_artifact`, `list_career_artifacts`)
 > still resolve (deprecated — switch to the `*_skill_forge_*` names). The one thing to do by
 > hand: if you installed the old slash command, delete `~/.claude/commands/career-mode.md`
-> and install `/skill-forge` (step 3) so you don't have both. These fallbacks are removed in
-> the next release.
+> and install `/skill-forge` (step 3) so you don't have both. These fallbacks still work in
+> 0.3 and will be removed in a later release.
+>
+> **Upgrading from 0.2?** Nothing breaks. Run `skill-forge stories migrate` once to bring your
+> existing artifacts into the story ledger. Everything else in v3 is opt-in.
 
 ### 2. Configure your LLM provider
 
@@ -630,8 +646,11 @@ src/
   output/         # Renderer (frontmatter + header + content) + connector interface
     connectors/   # LocalFileConnector, GistConnector, NotionConnector + self-registering registry
   auth/           # Connector auth flows — notion.ts (interactive), config-writer.ts (env/.yaml merge)
-  mcp/            # server.ts — MCP server: generate, list, share, notion_auth_status tools
-  index.ts        # CLI entry point — generate, list, share, auth subcommands
+  discovery/      # Prior-art and calibration scouts, quarantine, allowlisted providers; gap and contribution scouts
+  tailor/         # Skill taxonomy, JD parsing, story matching, tailoring report
+  digest/         # Weekly digest and its schedule (cron / Task Scheduler / routine prompt)
+  mcp/            # server.ts — MCP server: generate, list, share, inbox, prior-art plan, tailoring, digest, contributions
+  index.ts        # CLI entry point — every subcommand
 
 packages/
   codeintel/      # @abhinavravich1999/skill-forge-codeintel — optional companion: web-tree-sitter + vendored grammars
@@ -671,7 +690,29 @@ The MCP integration test (`tests/mcp-server.test.ts`) spawns `dist/mcp/server.js
 
 ## Status
 
-v0.1 — working, weekend-built. Tested on:
+**0.3.0 (v3).** 324 Vitest tests across 26 files, covering:
+- the ledger, judge and code intelligence;
+- capture, redaction and detectors for every host;
+- discovery, including a prompt-injection red-team fixture;
+- tailoring, digest and schedule;
+- the MCP tool surface.
+
+GitHub Actions CI runs on Node 20/22, Ubuntu and Windows, including a packed-tarball smoke test of the core alone (L0) and core plus companion (L1).
+
+Verified for v3:
+- the plugin manifests pass `claude plugin validate --strict`;
+- a detached observer worker outlives its parent on Windows;
+- capture runs in about 10 ms per event;
+- live grep.app and DeepWiki tool schemas, with discovery returning relevant libraries;
+- the ingest token comparison against v2.
+
+Not yet verified for v3:
+- a full live run of the observer through Claude Code's own hooks;
+- Codex and Cursor hooks against real sessions (their schemas are partial);
+- `digest schedule --install` against a real crontab or Task Scheduler;
+- the live-model evals (judge delta vs v2, `scripts/observer-replay.ts`).
+
+Earlier releases were tested on:
 
 - Automated test suite: 74 Vitest tests across 11 files (ingestor, renderer, prompt loader/version resolution, local/gist/notion connectors, return_only host-delivery, orchestrator/scout, MCP server integration) + GitHub Actions CI on Node 20/22, Ubuntu/Windows
 - Anthropic API (Claude Sonnet), Ollama (local, no key), DeepSeek via `openai-compatible`

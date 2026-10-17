@@ -1,7 +1,7 @@
 {
   "name": "skill-forge",
   "displayName": "skill-forge",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Turn coding sessions into interview-ready stories, resume bullets, and technical deep-dives — with an opt-in always-on observer that captures dead ends and tradeoffs as they happen.",
   "author": {
     "name": "Abinav Karthikeyan"

@@ -4,9 +4,27 @@ All notable changes to this project are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/) (pre-1.0: minor versions may include
 back-compatible renames).
 
-## Unreleased — v3
+## 0.3.0 — 2026-10-17 (v3)
 
-Work toward the v3 roadmap in `plan_v3.md`, one phase at a time.
+The v3 roadmap in `plan_v3.md`, built one phase at a time. First release of the optional companion `@abhinavravich1999/skill-forge-codeintel` (0.1.0).
+
+### Fixes from dogfooding (before release)
+These were found by running v3 on its own build session: a watcher backfill, the MCP tools in Claude Code, and the judge.
+- **Backfill** filed each session under its first working directory, so a session that started in another folder and moved into an enabled repository was silently skipped. It now uses the first enabled repository the session worked in.
+- **Tailoring for AI roles:**
+  - The taxonomy gains agentic-AI skills: AI agents, tool use, multi-agent orchestration, agent memory, context engineering, LLM evaluation, prompt-injection defense, AI safety, MCP, vector databases, LangGraph, LangChain, LlamaIndex, and fine-tuning.
+  - Requirement phrases now resolve to the skills they name ("Model Context Protocol (MCP)" → MCP, "agent memory and context engineering" → both).
+  - "LLM" now matches (short aliases are case-sensitive).
+  - The must-have cap rises from 15 to 25.
+  - On an AI-agent-platform job description, must-have coverage went from 3/15 to 10/16.
+- **Study targets:** multi-word skills are searched as a quoted phrase, then as topic slugs. Unquoted, "AI safety" returned a web framework and an email client.
+- **Contribution scout** searches repositories first. It finds repos with GitHub's `good-first-issues:>N` qualifier, at 200+ stars, healthy and licensed, then takes at most two issues from each. Searching issues directly had returned 1- to 4-star repositories.
+- **Observer and reflector prompts v2:** a request, a version bump, or a dry run is not an outcome. The v1 observer recorded a "published 0.3.0" milestone before anything was published.
+- Vitest `testTimeout` is now 20 s. Tests that drive real git repositories passed 5 s on a busy Windows machine.
+- Still open:
+  - a marathon session collapses into one story biased toward its end, because one observer pass sees about 24k characters;
+  - the judge doesn't see what the focus scout read, so it flags true details as unsupported;
+  - prior art for abstract architecture stories found 1 source instead of the target 2.
 
 ### Phase 3.5 — Compounding: JD tailoring, gap and contribution scouts, weekly digest
 - **Skill taxonomy** (`src/tailor/taxonomy.ts`): about 85 skills with aliases, categories, and
